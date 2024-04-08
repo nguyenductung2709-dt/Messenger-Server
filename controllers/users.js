@@ -4,7 +4,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 const crypto = require('crypto'); // used to generate random string
 const bcrypt = require('bcrypt'); // used to encrypt passwords
-const { User } = require('../models/index');
+const { User, Conversation } = require('../models/index');
 
 //AWS S3 SDK library to upload and get images from AWS S3
 const s3 = require('../utils/s3user');
@@ -17,7 +17,14 @@ const randomImageName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex'
 router.get('/', async(req, res) => {
     try {
         const users = await User.findAll({
-            attributes: { exclude: ['passwordHash'] } 
+            attributes: { exclude: ['passwordHash'] },
+            include: {
+                model: Conversation,
+                    as: 'conversation',
+                    through: {
+                        as: 'conversation',
+                    }
+            }
         });    
         for (const user of users) {
             const getObjectParams = {
@@ -39,12 +46,27 @@ router.get('/', async(req, res) => {
 router.get('/:id', async(req, res) => {
     try {
         const user = await User.findByPk(req.params.id, {
-            attributes: { exclude: ['passwordHash'] } 
-        });        
+            attributes: { exclude: ['passwordHash'] },
+            include: {
+                model: Conversation,
+                    as: 'conversation',
+                    through: {
+                        as: 'conversation',
+                    }
+            }        
+        });
+        const getObjectParams = {
+            Bucket: bucketName,
+            Key: user.avatarName,
+        }
+        const command = new GetObjectCommand(getObjectParams);
+        const url = await getSignedUrl(s3, command, {expiresIn: 3600});
+        user.avatarName = url;        
         
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
+        res.json(user);
     } catch(err) {
         console.error('Error updating user:', err);
         res.status(500).json({ error: 'Internal server error' });
