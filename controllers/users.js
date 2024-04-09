@@ -1,7 +1,11 @@
 const router = require('express').Router();
-const multer = require('multer'); // library to handle uploading files
+const middleware = require('../utils/middleware');
+
+// library to handle uploading files
+const multer = require('multer'); 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
+
 const crypto = require('crypto'); // used to generate random string
 const bcrypt = require('bcrypt'); // used to encrypt passwords
 const { User, Conversation } = require('../models/index');
@@ -12,7 +16,7 @@ const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aw
 const { getSignedUrl }  = require('@aws-sdk/s3-request-presigner');
 
 const bucketName = process.env.BUCKET_NAME
-const randomImageName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex');
+const randomImageName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex'); // generate random image name to avoid conflicts
 
 router.get('/', async(req, res) => {
     try {
@@ -26,6 +30,7 @@ router.get('/', async(req, res) => {
                     }
             }
         });    
+        // make avatarName into url for better use in frontend
         for (const user of users) {
             const getObjectParams = {
                 Bucket: bucketName,
@@ -55,6 +60,7 @@ router.get('/:id', async(req, res) => {
                     }
             }        
         });
+        // make avatarName into url for better use in frontend
         const getObjectParams = {
             Bucket: bucketName,
             Key: user.avatarName,
@@ -76,6 +82,8 @@ router.get('/:id', async(req, res) => {
 router.post('/', upload.single('avatarImage'), async(req, res) => {
     try {
         const imageName = randomImageName();
+
+        // handle uploading images to AWS S3
         const params = {
             Bucket: bucketName,
             Key: imageName,
@@ -86,15 +94,13 @@ router.post('/', upload.single('avatarImage'), async(req, res) => {
         const command = new PutObjectCommand(params)
         await s3.send(command)
 
+        // hash password with bcrypt
         const saltRounds = 10;
         const passwordHash = await bcrypt.hash(req.body.password, saltRounds)
 
         const user = await User.create({
-            gmail: req.body.gmail,
-            firstName: req.body.firstName,
-            passwordHash: passwordHash,
-            lastName: req.body.lastName,
-            middleName: req.body.middleName,
+            ...req.body,
+            passwordHash, 
             avatarName: imageName,
         })
         res.json(user);
@@ -104,13 +110,18 @@ router.post('/', upload.single('avatarImage'), async(req, res) => {
     }
 })
 
-router.put('/:id', upload.single('avatarImage'), async(req, res) => {
+router.put('/:id', upload.single('avatarImage'), middleware.findUserSession, async(req, res) => {
     try {
-        const userId = req.params.id;
-        const user = await User.findByPk(userId)
-        if (!user) {
+        const userWithId = await User.findByPk(req.params.id);
+        const user = req.user;
+        if (!userWithId) {
             return res.status(404).json({ error: 'User not found' });
         }
+        if (!user || user.id != req.params.id) {
+            return res.status(404).json({ error: 'Unauthorized' });
+        }
+
+        // handle put request with each element
         const updatedFields = {};
         if (req.body.gmail) {
             updatedFields.gmail = req.body.gmail;
@@ -125,8 +136,10 @@ router.put('/:id', upload.single('avatarImage'), async(req, res) => {
             updatedFields.middleName = req.body.middleName;
         }
         if (req.file) {
+            // updating image involves deleting the old image and upload a new image
             const imageName = randomImageName();
 
+            // handle deleting the old image
             const deleteParams = {
                 Bucket: bucketName,
                 Key: user.avatarName,
@@ -134,6 +147,7 @@ router.put('/:id', upload.single('avatarImage'), async(req, res) => {
             const deleteCommand = new DeleteObjectCommand(deleteParams)
             await s3.send(deleteCommand)
 
+            // handle uploading new image
             const updateParams = {
                 Bucket: bucketName,
                 Key: imageName,

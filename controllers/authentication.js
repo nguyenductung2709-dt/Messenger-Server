@@ -27,11 +27,15 @@ router.post('/login', async(req, res) => {
             id: user.id,
         }
         const token = jwt.sign(userForToken, SECRET,  { expiresIn: 60*60 })
+
+        // delete the previous login information
         await Session.destroy({
             where: {
                 userId: user.id,
               }
         })
+
+        // add the new login information
         await Session.create({
             userId: user.id,
             token: token,
@@ -47,8 +51,9 @@ router.post('/login', async(req, res) => {
 router.post('/logout', middleware.findUserSession, async (req, res, next) => {
     try {
       if (!req.user) {
-        throw Error('No user found!')
-      }
+        return res.status(404).json({ error: 'User not found' });
+    }
+      // delete information of the current login information
       const id = req.user.id
       await Session.destroy({ where: { userId: id } })
       return res.status(200).json({ message: 'Successfully logged out!' })

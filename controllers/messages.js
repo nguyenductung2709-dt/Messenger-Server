@@ -1,17 +1,22 @@
 const router = require('express').Router();
-const multer = require('multer'); // library to handle uploading files
+const middleware = require('../utils/middleware');
+
+// library to handle uploading files
+const multer = require('multer'); 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
+
 const crypto = require('crypto'); // used to generate random string
 const { Message, Conversation, User } = require('../models/index');
 
+//AWS S3 SDK library to upload and get images from AWS S3
 const s3 = require('../utils/s3user');
 const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl }  = require('@aws-sdk/s3-request-presigner');
 
 const bucketName = process.env.BUCKET_NAME
 
-const generateRandomName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex');
+const generateRandomName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex'); // generate random image name to avoid conflicts
 
 router.get('/', async (req, res) => {
     try {
@@ -31,8 +36,10 @@ router.get('/', async (req, res) => {
                 }
             ]
         });
+        // a message can contain a file or an image 
         for (const message of messages) {
             let getObjectParams = {}
+            // handle making imageName into url 
             if (message.imageName) {
                 getObjectParams = {
                     Bucket: bucketName,
@@ -42,6 +49,7 @@ router.get('/', async (req, res) => {
                 const url = await getSignedUrl(s3, command, {expiresIn: 3600});
                 message.imageName = url;
             }
+            // handle making fileName into url 
             else {
                 getObjectParams = {
                     Bucket: bucketName,
@@ -80,6 +88,7 @@ router.get('/:id', async(req,res) => {
 
         let getObjectParams = {}
 
+        // handle making imageName into url 
         if (message.imageName) {
             getObjectParams = {
                 Bucket: bucketName,
@@ -90,6 +99,7 @@ router.get('/:id', async(req,res) => {
             message.imageName = url;
         }
 
+        // handle making fileName into url
         else {
             getObjectParams = {
                 Bucket: bucketName,
@@ -111,8 +121,12 @@ router.get('/:id', async(req,res) => {
     }
 })
 
-router.post('/', upload.single('messageImage'), async(req, res) => {
+router.post('/', upload.single('messageImage'), middleware.findUserSession, async(req, res) => {
     try {
+        const user = req.user;
+        if (!user) {
+            return res.status(404).json({ error: 'Unauthorized' });
+        }
         const originalName = req.file.originalname;
         const randomName = generateRandomName();
         const params = {
@@ -128,11 +142,12 @@ router.post('/', upload.single('messageImage'), async(req, res) => {
             ...req.body,
         };
 
+        // test if the file sent is image or file (attachments)
         const imageExtensionsRegex = /\.(jpg|jpeg|png|HEIC)$/i;
         if (imageExtensionsRegex.test(originalName)) {
-            messageData.imageName = randomName;
+            messageData.imageName = randomName; // if has tail as above, it will be stored in imageName
         } else {
-            messageData.fileName = randomName;
+            messageData.fileName = randomName;  // else, it will be stored in fileName
         }
 
         const message = await Message.create(messageData);
@@ -144,14 +159,20 @@ router.post('/', upload.single('messageImage'), async(req, res) => {
         res.status(500).json({ error: 'Failed to create message' });    }
 });
 
-router.put('/:id', upload.single('messageImage'), async(req, res) => {
+router.put('/:id', upload.single('messageImage'), middleware.findUserSession, async(req, res) => {
     try {
         const message = await Message.findByPk(req.params.id);
-
+        const user = req.user;
         if (!message) {
             return res.status(404).json({ error: 'Message not found' });
         }
 
+        // handle if current user has the same id with owner of the message
+        if (!user || user.id != message.user.id) {
+            return res.status(404).json({ error: 'Unauthorized' });
+        } 
+
+        // handle updating of each element
         const updatedFields = {};
 
         if (req.body.message) {
@@ -185,11 +206,17 @@ router.put('/:id', upload.single('messageImage'), async(req, res) => {
     }
 })
 
-router.delete('/:id', async(req, res) => {
+router.delete('/:id', middleware.findUserSession, async(req, res) => {
     try {
         const message = await Message.findByPk(req.params.id);
         if (!message) {
             return res.status(404).json({ error: 'Message not found' });
+        }
+
+        // handle if the current user is the same as the owner of this message
+        const user = req.user;
+        if (!user || user.id != message.user.id) {
+            return res.status(404).json({ error: 'Unauthorized' });
         }
         await message.destroy();
     } catch (err) {
