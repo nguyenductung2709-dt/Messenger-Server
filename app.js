@@ -7,6 +7,7 @@ const conversationsRouter = require('./controllers/conversations')
 const messagesRouter = require('./controllers/messages')
 const authenticationRouter = require('./controllers/authentication')
 const participantsRouter = require('./controllers/participants')
+const friendsRouter = require('./controllers/friends')
 
 //initialize express app
 const express = require('express')
@@ -22,5 +23,6 @@ app.use('/api/auth', authenticationRouter);
 app.use('/api/participants', participantsRouter);
 app.use('/api/conversations', conversationsRouter);
 app.use('/api/messages', messagesRouter);
+app.use('/api/friends', friendsRouter)
 
 module.exports = app;

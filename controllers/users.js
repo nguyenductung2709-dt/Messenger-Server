@@ -8,7 +8,7 @@ const upload = multer({ storage: storage });
 
 const crypto = require('crypto'); // used to generate random string
 const bcrypt = require('bcrypt'); // used to encrypt passwords
-const { User, Conversation } = require('../models/index');
+const { User, Conversation, Friend } = require('../models/index');
 
 //AWS S3 SDK library to upload and get images from AWS S3
 const s3 = require('../utils/s3user');
@@ -22,13 +22,18 @@ router.get('/', async(req, res) => {
     try {
         const users = await User.findAll({
             attributes: { exclude: ['passwordHash'] },
-            include: {
-                model: Conversation,
+            include: [
+                {
+                    model: Conversation,
                     as: 'conversation',
                     through: {
                         as: 'conversation',
                     }
-            }
+                }, 
+                {
+                    model: Friend,
+                }
+            ]
         });    
         // make avatarName into url for better use in frontend
         for (const user of users) {
@@ -52,13 +57,18 @@ router.get('/:id', async(req, res) => {
     try {
         const user = await User.findByPk(req.params.id, {
             attributes: { exclude: ['passwordHash'] },
-            include: {
-                model: Conversation,
+            include: [
+                {
+                    model: Conversation,
                     as: 'conversation',
                     through: {
                         as: 'conversation',
                     }
-            }        
+                },
+                {
+                    model: Friend,
+                }
+            ]        
         });
         // make avatarName into url for better use in frontend
         const getObjectParams = {
