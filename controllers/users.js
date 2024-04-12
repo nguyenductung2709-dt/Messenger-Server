@@ -46,7 +46,7 @@ router.get('/', async(req, res) => {
             user.avatarName = url;
             delete user.passwordHash;
         }
-        res.json(users);
+        res.status(200).json(users)
     } catch (err) {
         console.error('Error updating user:', err);
         res.status(500).json({ error: 'Internal server error' });
@@ -70,6 +70,9 @@ router.get('/:id', async(req, res) => {
                 }
             ]        
         });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }       
         // make avatarName into url for better use in frontend
         const getObjectParams = {
             Bucket: bucketName,
@@ -78,13 +81,9 @@ router.get('/:id', async(req, res) => {
         const command = new GetObjectCommand(getObjectParams);
         const url = await getSignedUrl(s3, command, {expiresIn: 3600});
         user.avatarName = url;        
-        
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        res.json(user);
+        res.status(200).json(user)
     } catch(err) {
-        console.error('Error updating user:', err);
+        console.error('Error getting user:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 })
@@ -113,7 +112,7 @@ router.post('/', upload.single('avatarImage'), async(req, res) => {
             passwordHash, 
             avatarName: imageName,
         })
-        res.json(user);
+        res.status(201).json(user)
     } catch (err) {
         console.error('Error updating user:', err);
         res.status(500).json({ error: 'Internal server error' });
@@ -169,7 +168,7 @@ router.put('/:id', upload.single('avatarImage'), middleware.findUserSession, asy
             updatedFields.avatarName = imageName;
         }
         await user.update(updatedFields);
-        res.json(user);
+        res.status(201).json(user)
     } catch (err) {
         console.error('Error updating user:', err);
         res.status(500).json({ error: 'Internal server error' });
