@@ -1,11 +1,11 @@
 const router = require('express').Router();
 const middleware = require('../utils/middleware');
-const { Participant, Conversation } = require('../models/index');
+const { Participant, Conversation, Message, User } = require('../models/index');
 
 router.get('/', async (req, res) => {
     try {
         const participants = await Participant.findAll({});
-        res.json(participants);
+        res.status(200).json(participants);
     } catch (err) {
         console.error('Error retrieving participants:', err);
         res.status(500).json({ error: 'Internal server error' });
@@ -14,8 +14,32 @@ router.get('/', async (req, res) => {
 
 router.post('/', middleware.findUserSession, async (req, res) => {
     try {
-        const conversationId = req.body.conversationId;
-        const conversation = await Conversation.findByPk(conversationId);
+        const conversation = await Conversation.findByPk(req.body.conversationId, {
+            include: 
+            [
+                {
+                    model: Message,
+                    attributes: {
+                        exclude: ['createdAt', 'updatedAt'],
+                    },
+                },
+                {
+                    model: User,
+                    as: 'participant_list',
+                    attributes: {
+                        exclude: ['passwordHash', 'createdAt', 'updatedAt'],
+                    },
+                    through: {
+                        attributes: {
+                            exclude: ['createdAt', 'updatedAt', 'userId'],
+                        },
+                        as: 'participant_details'
+                    }
+                }
+            ]
+            
+        });              
+
         if (!conversation) {
             return res.status(404).json({ error: 'Conversation not found' });
         }
@@ -29,7 +53,7 @@ router.post('/', middleware.findUserSession, async (req, res) => {
             return res.status(404).json({ error: 'Unauthorized' });
         }
         const participant = await Participant.create(req.body);
-        res.json(participant);
+        res.status(201).json(participant);
     } catch (err) {
         console.error('Error creating participant:', err);
         res.status(500).json({ error: 'Internal server error' });
@@ -42,11 +66,38 @@ router.put('/:id', middleware.findUserSession, async (req, res) => {
         if (!participant) {
             return res.status(404).json({ error: 'Participant not found' });
         }
+
         // take the conversation that participant belongs to 
-        const conversation = await Conversation.findByPk(participant.conversationId);
+        const conversation = await Conversation.findByPk(participant.conversationId, {
+            include: 
+            [
+                {
+                    model: Message,
+                    attributes: {
+                        exclude: ['createdAt', 'updatedAt'],
+                    },
+                },
+                {
+                    model: User,
+                    as: 'participant_list',
+                    attributes: {
+                        exclude: ['passwordHash', 'createdAt', 'updatedAt'],
+                    },
+                    through: {
+                        attributes: {
+                            exclude: ['createdAt', 'updatedAt', 'userId'],
+                        },
+                        as: 'participant_details'
+                    }
+                }
+            ]
+            
+        });          
+        
         if (!conversation) {
             return res.status(404).json({ error: 'Conversation not found' });
         }
+
         // check if the current user is admin of this conversation
         const user = req.user;
         const userInConversation = conversation.participant_list.find(participant => participant.id === user.id)
@@ -55,7 +106,7 @@ router.put('/:id', middleware.findUserSession, async (req, res) => {
         }
         participant.isAdmin = true;
         await participant.save();
-        res.json(participant);
+        res.status(201).json(participant);
     } catch (err) {
         console.error('Error creating admin:', err);
         res.status(500).json({ error: 'Internal server error' });
@@ -71,7 +122,32 @@ router.delete('/:id', middleware.findUserSession, async (req, res) => {
         }
 
         // take the conversation that participant belongs to 
-        const conversation = await Conversation.findByPk(participant.conversationId);
+        const conversation = await Conversation.findByPk(participant.conversationId, {
+            include: 
+            [
+                {
+                    model: Message,
+                    attributes: {
+                        exclude: ['createdAt', 'updatedAt'],
+                    },
+                },
+                {
+                    model: User,
+                    as: 'participant_list',
+                    attributes: {
+                        exclude: ['passwordHash', 'createdAt', 'updatedAt'],
+                    },
+                    through: {
+                        attributes: {
+                            exclude: ['createdAt', 'updatedAt', 'userId'],
+                        },
+                        as: 'participant_details'
+                    }
+                }
+            ]
+            
+        });      
+        
         if (!conversation) {
             return res.status(404).json({ error: 'Conversation not found' });
         }
@@ -84,6 +160,7 @@ router.delete('/:id', middleware.findUserSession, async (req, res) => {
         }
 
         await participant.destroy();
+        res.status(204).json(participant);
     } catch (err) {
         console.error('Error deleting participant:', err);
         res.status(500).json({ error: 'Internal server error' });
