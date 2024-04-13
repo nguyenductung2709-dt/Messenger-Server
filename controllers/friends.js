@@ -1,11 +1,11 @@
-const { Friend } = require('../models/index');
+const { Friend, Conversation, Participant } = require('../models/index');
 const router = require('express').Router();
 const middleware = require('../utils/middleware');
 
 router.get('/', async(req, res) => {
     try {
         const friends = await Friend.findAll({});
-        res.json(friends);
+        res.status(200).json(friends)
     } catch (err) {
         console.error('Error retrieving friends:', err);
         res.status(500).json({ error: 'Internal server error' });
@@ -18,7 +18,7 @@ router.get('/:id', async(req, res) => {
         if (!friend) {
             return res.status(404).json({ error: 'Friend not found' });
         }
-        res.json(friend);
+        res.status(200).json(friend)
     } catch (err) {
         console.error('Error retrieving friend:', err);
         res.status(500).json({ error: 'Internal server error' });
@@ -54,12 +54,27 @@ router.post('/', middleware.findUserSession, async(req, res) => {
 
         const secondFriend = await Friend.create(anotherDetails);
 
+        // After adding a friend, a conversation between them will be formed
+        const conversation = await Conversation.create({
+            creatorId: firstFriend.id,
+        })
+
+        await Participant.create({
+            conversationId: conversation.id,
+            userId: firstFriend.id,
+        })
+
+        await Participant.create({
+            conversationId: conversation.id,
+            userId: secondFriend.id,
+        })
+
         const returnedDetails = {
             firstFriend,
             secondFriend,
         }
 
-        res.json(returnedDetails)
+        res.status(201).json(returnedDetails);
     } catch (err) {
         console.error('Error creating friend:', err);
         res.status(500).json({ error: 'Internal server error' });
@@ -93,7 +108,7 @@ router.delete('/:id', middleware.findUserSession, async(req, res) => {
             secondFriend,
         }
 
-        res.json(returnedDetails)    
+        res.status(204).json(returnedDetails)
     } catch (err) {
         console.error('Error deleting friend:', err);
         res.status(500).json({ error: 'Internal server error' });

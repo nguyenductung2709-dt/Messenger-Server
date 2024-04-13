@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { Conversation, Message, User } = require('../models/index');
+const { Conversation, Message, User, Participant } = require('../models/index');
 const middleware = require('../utils/middleware');
 
 // library to handle uploading files
@@ -125,6 +125,13 @@ router.post('/', upload.single('groupImage'), middleware.findUserSession, async(
             ...req.body,
             imageName: imageName,
         });
+
+        // after creating a conversation, the creator will become the first and admin of the conversation
+        await Participant.create({
+            conversationId: conversation.id,
+            userId: conversation.creatorId,
+            idAdmin: true
+        })
         res.json(conversation);
     }
     catch (err) {
