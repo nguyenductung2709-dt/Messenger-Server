@@ -45,15 +45,17 @@ router.get('/', async(req, res) => {
         });        
         // make imageName into url for better use in frontend
         for (const conversation of conversations) {
-            const getObjectParams = {
-                Bucket: bucketName,
-                Key: conversation.imageName,
+            if (conversation.imageName) {
+                const getObjectParams = {
+                    Bucket: bucketName,
+                    Key: conversation.imageName,
+                }
+                const command = new GetObjectCommand(getObjectParams);
+                const url = await getSignedUrl(s3, command, {expiresIn: 3600});
+                conversation.imageName = url;
             }
-            const command = new GetObjectCommand(getObjectParams);
-            const url = await getSignedUrl(s3, command, {expiresIn: 3600});
-            conversation.imageName = url;
         }    
-        res.json(conversations)
+        res.status(200).json(conversations)
     }
     catch (err) {
         res.status(500).json({ error: 'Internal server error' });
@@ -88,16 +90,22 @@ router.get('/:id', async (req, res) => {
             
         });
 
-        // make imageName into url for better use in frontend
-        const getObjectParams = {
-            Bucket: bucketName,
-            Key: conversation.imageName,
+        if (!conversation) {
+            return res.status(404).json({ error: 'Conversation not found' });
         }
-        const command = new GetObjectCommand(getObjectParams);
-        const url = await getSignedUrl(s3, command, {expiresIn: 3600});
-        conversation.imageName = url;
 
-        res.json(conversation);
+        // make imageName into url for better use in frontend
+        if (conversation.imageName) {
+            const getObjectParams = {
+                Bucket: bucketName,
+                Key: conversation.imageName,
+            }
+            const command = new GetObjectCommand(getObjectParams);
+            const url = await getSignedUrl(s3, command, {expiresIn: 3600});
+            conversation.imageName = url;
+        }
+
+        res.status(200).json(conversation);
     }
     catch (err) {
         res.status(500).json({ error: 'Internal server error' });
@@ -110,29 +118,39 @@ router.post('/', upload.single('groupImage'), middleware.findUserSession, async(
         if (!user) {
             return res.status(404).json({ error: 'Unauthorized' });
         }
+        
+        let conversation;
+
+        if (req.file) {
         // handle uploading new groupImage
-        const imageName = randomImageName();
-        const params = {
-            Bucket: bucketName,
-            Key: imageName,
-            Body: req.file.buffer,
-            ContentType: req.file.mimetype,
+            const imageName = randomImageName();
+            const params = {
+                Bucket: bucketName,
+                Key: imageName,
+                Body: req.file.buffer,
+                ContentType: req.file.mimetype,
+            }
+            const command = new PutObjectCommand(params)
+            await s3.send(command)
+
+            conversation = await Conversation.create({
+                ...req.body,
+                imageName: imageName,
+            });
         }
-        const command = new PutObjectCommand(params)
-        await s3.send(command)
 
-        const conversation = await Conversation.create({
-            ...req.body,
-            imageName: imageName,
-        });
-
+        else {
+            conversation = await Conversation.create({
+                ...req.body,
+            })
+        }
         // after creating a conversation, the creator will become the first and admin of the conversation
         await Participant.create({
             conversationId: conversation.id,
             userId: conversation.creatorId,
-            idAdmin: true
+            isAdmin: true
         })
-        res.json(conversation);
+        res.status(201).json(conversation);
     }
     catch (err) {
         res.status(500).json({ error: 'Internal server error' });
@@ -204,7 +222,7 @@ router.put('/:id', upload.single('groupImage'), middleware.findUserSession, asyn
             updatedFields.imageName = imageName;
         }
         await conversation.update(updatedFields);
-        res.json(conversation);
+        res.status(201).json(conversation);
     } catch(err) {
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -212,7 +230,32 @@ router.put('/:id', upload.single('groupImage'), middleware.findUserSession, asyn
 
 router.delete('/:id', middleware.findUserSession, async(req, res) => {
     try {
-        const conversation = await Conversation.findByPk(req.params.id);
+        const conversation = await Conversation.findByPk(req.params.id, {
+            include: 
+            [
+                {
+                    model: Message,
+                    attributes: {
+                        exclude: ['createdAt', 'updatedAt'],
+                    },
+                },
+                {
+                    model: User,
+                    as: 'participant_list',
+                    attributes: {
+                        exclude: ['passwordHash', 'createdAt', 'updatedAt'],
+                    },
+                    through: {
+                        attributes: {
+                            exclude: ['createdAt', 'updatedAt', 'userId'],
+                        },
+                        as: 'participant_details'
+                    }
+                }
+            ]
+            
+        });        
+
         if (!conversation) {
             return res.status(404).json({ error: 'Conversation not found' });
         }
@@ -225,8 +268,10 @@ router.delete('/:id', middleware.findUserSession, async(req, res) => {
         if (!user || !userInConversation || !userInConversation.participant_details.isAdmin) {
             return res.status(404).json({ error: 'Unauthorized' });
         }
+        const participants = await Participant.findAll({ where: { conversationId: conversation.id} });    
+        await Promise.all(participants.map(participant => participant.destroy()));
         await conversation.destroy();
-        res.json(conversation);
+        res.status(204).json(conversation);
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
     }

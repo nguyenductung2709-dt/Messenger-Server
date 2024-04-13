@@ -1,4 +1,4 @@
-const { User, Session, Friend, Conversation } = require('../models/index');
+const { User, Session, Friend, Conversation, Participant } = require('../models/index');
 const supertest = require('supertest');
 const app = require('../app')
 const api = supertest(app);
@@ -9,9 +9,10 @@ const bucketName = process.env.BUCKET_NAME
 
 beforeEach(async () => {
     try {
-        await Conversation.destroy({ where: {} });
-        await Friend.destroy({ where: {} });
         await Session.destroy({ where: {} });
+        await Friend.destroy({ where: {} });
+        await Participant.destroy({ where: {} });
+        await Conversation.destroy({ where: {} });
         await User.destroy({ where: {} });
     } catch (error) {
         console.error('Error deleting users:', error);

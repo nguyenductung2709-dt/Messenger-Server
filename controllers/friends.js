@@ -56,17 +56,17 @@ router.post('/', middleware.findUserSession, async(req, res) => {
 
         // After adding a friend, a conversation between them will be formed
         const conversation = await Conversation.create({
-            creatorId: firstFriend.id,
+            creatorId: firstFriend.userId,
         })
 
         await Participant.create({
             conversationId: conversation.id,
-            userId: firstFriend.id,
+            userId: firstFriend.userId,
         })
 
         await Participant.create({
             conversationId: conversation.id,
-            userId: secondFriend.id,
+            userId: secondFriend.userId,
         })
 
         const returnedDetails = {
