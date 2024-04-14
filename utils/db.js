@@ -2,9 +2,7 @@ const Sequelize = require("sequelize");
 const { DATABASE_URL } = require("./config");
 const { Umzug, SequelizeStorage } = require("umzug");
 
-const sequelize = new Sequelize(DATABASE_URL, {
-  dialect: "postgresql",
-});
+const sequelize = new Sequelize(DATABASE_URL);
 
 const connectToDatabase = async () => {
   try {
