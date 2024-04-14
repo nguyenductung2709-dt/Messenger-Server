@@ -19,6 +19,7 @@ jobs:
         BUCKET_REGION: ${{ secrets.BUCKET_REGION }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
     steps:
       - name: Checkout directory
         uses: actions/checkout@v4
@@ -38,11 +39,10 @@ jobs:
       - name: Run tests
         run: npm run test
 
-      - name: Trigger Deployment
-        env: FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        steps:
-            - uses: superfly/flyctl-actions/setup-flyctl@master
-            - run: flyctl deploy --remote-only
+      - name: Deploy to Fly.io
+        uses: superfly/flyctl-actions@v1
+        with:
+          args: deploy --remote-only
 
       - name: Stop PostgreSQL container
         run: docker stop postgres
