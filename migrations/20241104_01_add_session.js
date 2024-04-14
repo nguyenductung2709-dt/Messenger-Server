@@ -1,7 +1,7 @@
-const { DataTypes } = require('sequelize')
+const { DataTypes } = require("sequelize");
 module.exports = {
   up: async ({ context: queryInterface }) => {
-    await queryInterface.createTable('sessions', {
+    await queryInterface.createTable("sessions", {
       id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
@@ -11,7 +11,7 @@ module.exports = {
         type: DataTypes.INTEGER,
         unique: true,
         allowNull: false,
-        references: { model: 'users', key: 'id' },
+        references: { model: "users", key: "id" },
       },
       token: {
         type: DataTypes.STRING,
@@ -26,9 +26,9 @@ module.exports = {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
       },
-    })
+    });
   },
   down: async ({ context: queryInterface }) => {
-    await queryInterface.dropTable('sessions')
+    await queryInterface.dropTable("sessions");
   },
-}
+};

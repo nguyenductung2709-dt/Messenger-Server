@@ -1,45 +1,48 @@
-const { Model, DataTypes } = require('sequelize');
-const { sequelize } = require('../utils/db');
+const { Model, DataTypes } = require("sequelize");
+const { sequelize } = require("../utils/db");
 
 class Message extends Model {}
-Message.init({
+Message.init(
+  {
     id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
     },
     conversationId: {
-        type: DataTypes.INTEGER,
-        references: { model: 'conversations', key: 'id' },
+      type: DataTypes.INTEGER,
+      references: { model: "conversations", key: "id" },
     },
     senderId: {
-        type: DataTypes.INTEGER,
-        references: { model: 'users', key: 'id' },
+      type: DataTypes.INTEGER,
+      references: { model: "users", key: "id" },
     },
     message: {
-        type: DataTypes.TEXT,
-        allowNull: false,
+      type: DataTypes.TEXT,
+      allowNull: false,
     },
     fileName: {
-        type: DataTypes.TEXT,
+      type: DataTypes.TEXT,
     },
     imageName: {
-        type: DataTypes.TEXT,
+      type: DataTypes.TEXT,
     },
     createdAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: new Date()
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: new Date(),
     },
     updatedAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: new Date()
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: new Date(),
     },
-}, {
+  },
+  {
     sequelize,
     underscored: true,
-    modelName: 'message'
-})
+    modelName: "message",
+  },
+);
 
-module.exports = Message
+module.exports = Message;
