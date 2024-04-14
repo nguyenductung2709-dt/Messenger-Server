@@ -39,8 +39,10 @@ jobs:
         run: npm run test
 
       - name: Trigger Deployment
-        if: ${{ github.event_name == 'push' && !contains(toJson(github.event.commits.*.message), '#skip') }}
-        run: fly deploy
+        env: FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        steps:
+            - uses: superfly/flyctl-actions/setup-flyctl@master
+            - run: flyctl deploy --remote-only
 
       - name: Stop PostgreSQL container
         run: docker stop postgres
