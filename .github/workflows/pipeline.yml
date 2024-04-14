@@ -1,32 +1,38 @@
 name: Deployment Pipeline
 
 on:
-    push:
-        branches:
-            - main
-    pull_request:
-        branches: [main]
-        types: [opened, synchronize]
-    
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+
 jobs:
-    simple_deployment_pipeline:
-        runs-on: ubuntu-20.04
-        steps:
-            - name: Checkout directory
-              uses: actions/checkout@v4
-            
-            - name: Set up Nodejs
-              uses: actions/setup-node@v4
+  simple_deployment_pipeline:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout directory
+        uses: actions/checkout@v4
 
-            - name: Install dependencies
-              run: npm install
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
 
-            - name: Initialize PostgreSQL container
-              run: docker run -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 postgres
+      - name: Install dependencies
+        run: npm install
 
-            - name: test
-              run: npm run test
+      - name: Start PostgreSQL container
+        run: |
+          docker run --name postgres -d -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 postgres
+          # Wait for PostgreSQL to be ready
+          docker exec postgres sh -c 'while ! pg_isready -q -h localhost -p 5432 -U postgres; do sleep 1; done'
 
-            - name: Trigger Deployment
-              if: ${{ github.event_name == 'push' && !contains(toJson(github.event.commits.*.message), '#skip') }}
-              run: fly deploy
+      - name: Run tests
+        run: npm run test
+
+      - name: Trigger Deployment
+        if: ${{ github.event_name == 'push' && !contains(toJson(github.event.commits.*.message), '#skip') }}
+        run: fly deploy
+
+      - name: Stop PostgreSQL container
+        run: docker stop postgres
