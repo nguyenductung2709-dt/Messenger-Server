@@ -6,6 +6,12 @@ const sequelize = new Sequelize(DATABASE_URL, {
   dialect: 'postgresql',
 });
 
+sequelize.options.logging = (msg) => {
+  if (msg.startsWith('error')) {
+    console.log(msg);
+  }
+};
+
 const connectToDatabase = async () => {
   try {
     await sequelize.authenticate();
