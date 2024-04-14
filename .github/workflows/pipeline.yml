@@ -21,11 +21,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Start PostgreSQL container
+      - name: Load environment variables
         run: |
-          docker run --name postgres -d -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 postgres
-          # Wait for PostgreSQL to be ready
-          docker exec postgres sh -c 'while ! pg_isready -q -h localhost -p 5432 -U postgres; do sleep 1; done'
+          echo "Loading environment variables"
+          source .env
 
       - name: Run tests
         run: npm run test
@@ -33,6 +32,3 @@ jobs:
       - name: Trigger Deployment
         if: ${{ github.event_name == 'push' && !contains(toJson(github.event.commits.*.message), '#skip') }}
         run: fly deploy
-
-      - name: Stop PostgreSQL container
-        run: docker stop postgres
