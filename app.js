@@ -15,7 +15,12 @@ const { app } = require('./socket/socket.js');
 
 //allow cors to connect from frontend
 const cors = require("cors");
-app.use(cors());
+app.use(cors(
+    {
+        origin: "http://localhost:5173",
+        credentials: true
+    }
+));
 require("dotenv").config();
 app.use(express.json());
 app.use("/api/users", usersRouter);
