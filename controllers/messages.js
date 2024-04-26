@@ -18,6 +18,8 @@ const {
 } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
+const { getReceiverSocketId, io } = require('../socket/socket.js');
+
 const bucketName = process.env.BUCKET_NAME;
 
 const generateRandomName = (bytes = 32) =>
@@ -45,24 +47,24 @@ router.get("/", async (req, res) => {
     for (const message of messages) {
       let getObjectParams = {};
       // handle making imageName into url
-      if (message.imageName) {
+      if (message.imageUrl) {
         getObjectParams = {
           Bucket: bucketName,
-          Key: message.imageName,
+          Key: message.imageUrl,
         };
         const command = new GetObjectCommand(getObjectParams);
         const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-        message.imageName = url;
+        message.imageUrl = url;
       }
       // handle making fileName into url
-      else {
+      if (message.fileUrl) {
         getObjectParams = {
           Bucket: bucketName,
-          Key: message.fileName,
+          Key: message.fileUrl,
         };
         const command = new GetObjectCommand(getObjectParams);
         const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-        message.fileName = url;
+        message.fileUrl = url;
       }
     }
     res.status(200).json(messages);
@@ -74,7 +76,10 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const message = await Message.findByPk(req.params.id, {
+    const messages = await Message.findAll({
+      where: {
+        conversationId: req.params.id
+      },
       include: [
         {
           model: Conversation,
@@ -91,37 +96,36 @@ router.get("/:id", async (req, res) => {
       ],
     });
 
-    let getObjectParams = {};
+    for (const message of messages) {
+      let getObjectParams = {};
 
-    // handle making imageName into url
-    if (message.imageName) {
-      getObjectParams = {
-        Bucket: bucketName,
-        Key: message.imageName,
-      };
-      const command = new GetObjectCommand(getObjectParams);
-      const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-      message.imageName = url;
+      // handle making imageName into url
+      if (message.imageUrl) {
+        getObjectParams = {
+          Bucket: bucketName,
+          Key: message.imageUrl,
+        };
+        const command = new GetObjectCommand(getObjectParams);
+        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        message.imageUrl = url;
+      }
+
+      // handle making fileName into url
+      if (message.fileUrl) {
+        getObjectParams = {
+          Bucket: bucketName,
+          Key: message.fileUrl,
+        };
+        const command = new GetObjectCommand(getObjectParams);
+        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        message.fileUrl = url;
+      }
     }
 
-    // handle making fileName into url
-    else {
-      getObjectParams = {
-        Bucket: bucketName,
-        Key: message.fileName,
-      };
-      const command = new GetObjectCommand(getObjectParams);
-      const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-      message.fileName = url;
-    }
-
-    if (!message) {
-      return res.status(404).json({ error: "Message not found" });
-    }
-    res.status(200).json(message);
+    res.status(200).json(messages);
   } catch (err) {
-    console.error("Error retrieving message", err);
-    res.status(500).json({ error: "Failed to retrieve message" });
+    console.error("Error retrieving messages:", err);
+    res.status(500).json({ error: "Failed to retrieve messages" });
   }
 });
 
@@ -135,33 +139,88 @@ router.post(
       if (!user) {
         return res.status(404).json({ error: "Unauthorized" });
       }
-      const originalName = req.file.originalname;
-      const randomName = generateRandomName();
-      const params = {
-        Bucket: bucketName,
-        Key: randomName,
-        Body: req.file.buffer,
-        ContentType: req.file.mimetype,
-      };
-      const command = new PutObjectCommand(params);
-      await s3.send(command);
 
       let messageData = {
+        senderId: user.id,
         ...req.body,
       };
 
-      // test if the file sent is image or file (attachments)
-      const imageExtensionsRegex = /\.(jpg|jpeg|png|HEIC|webp)$/i;
-      if (imageExtensionsRegex.test(originalName)) {
-        messageData.imageName = randomName; // if has tail as above, it will be stored in imageName
-      } else {
-        messageData.fileName = randomName; // else, it will be stored in fileName
+      if (req.file) {
+        const originalName = req.file.originalname;
+        const randomName = generateRandomName();
+        const params = {
+          Bucket: bucketName,
+          Key: randomName,
+          Body: req.file.buffer,
+          ContentType: req.file.mimetype,
+        };
+        const command = new PutObjectCommand(params);
+        await s3.send(command);
+
+        const imageExtensionsRegex = /\.(jpg|jpeg|png|HEIC|webp)$/i;
+        if (imageExtensionsRegex.test(originalName)) {
+          messageData.imageUrl = randomName; // if has tail as above, it will be stored in imageName
+        } else {
+          messageData.fileUrl = randomName; // else, it will be stored in fileName
+          messageData.fileName = req.file.originalname; // store fileName
+        }
       }
 
-      const message = await Message.create(messageData);
-      res.status(201).json(message);
+      messageData.createdAt = new Date();
+      messageData.updatedAt = new Date();
 
-      console.log(req.file.originalname);
+      const message = await Message.create(messageData);
+
+      const conversation = await Conversation.findOne({
+        where: { id: req.body.conversationId },
+        include: [
+          {
+            model: User,
+            as: "participant_list",
+            attributes: { exclude: ["passwordHash", "createdAt", "updatedAt"] },
+            through: {
+              attributes: { exclude: ["createdAt", "updatedAt", "userId"] },
+              as: "participant_details",
+            },
+          },
+        ],
+      });
+
+      let getObjectParams = {};
+
+      // handle making imageName into url
+      if (message.imageUrl) {
+        getObjectParams = {
+          Bucket: bucketName,
+          Key: message.imageUrl,
+        };
+        const command = new GetObjectCommand(getObjectParams);
+        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        message.imageUrl = url;
+      }
+
+      // handle making fileName into url
+      if (message.fileUrl) {
+        getObjectParams = {
+          Bucket: bucketName,
+          Key: message.fileUrl,
+        };
+        const command = new GetObjectCommand(getObjectParams);
+        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        message.fileUrl = url;
+      }
+    
+      
+      const participantIds = conversation.participant_list.map(participant => participant.id);
+
+      for (const participantId of participantIds) {
+        const receiverSocketId = getReceiverSocketId(participantId);
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit("newMessage", message);
+        }
+      }
+
+      res.status(201).json(message);
     } catch (err) {
       console.error("Error creating message:", err);
       res.status(500).json({ error: "Failed to create message" });
@@ -194,17 +253,17 @@ router.put(
       }
       if (req.file) {
         let deleteParams = {};
-        if (message.imageName) {
+        if (message.imageUrl) {
           deleteParams = {
             Bucket: bucketName,
-            Key: message.imageName,
+            Key: message.imageUrl,
           };
         }
 
-        if (message.fileName) {
+        if (message.fileUrl) {
           deleteParams = {
             Bucket: bucketName,
-            Key: message.fileName,
+            Key: message.fileUrl,
           };
         }
         const deleteCommand = new DeleteObjectCommand(deleteParams);
@@ -223,12 +282,12 @@ router.put(
 
         const imageExtensionsRegex = /\.(jpg|jpeg|png|HEIC)$/i;
         if (imageExtensionsRegex.test(originalName)) {
-          updatedFields.imageName = randomName;
+          updatedFields.imageUrl = randomName;
         } else {
-          updatedFields.fileName = randomName;
+          updatedFields.fileUrl = randomName;
         }
       }
-
+      updatedFields.updatedAt = new Date();
       await message.update(updatedFields);
       res.status(201).json(message);
     } catch (err) {

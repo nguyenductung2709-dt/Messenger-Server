@@ -32,7 +32,7 @@ router.get("/", async (req, res) => {
           model: Conversation,
           as: "conversation",
           through: {
-            as: "conversation",
+            as: "participant",
           },
         },
         {
@@ -49,7 +49,6 @@ router.get("/", async (req, res) => {
       const command = new GetObjectCommand(getObjectParams);
       const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
       user.avatarName = url;
-      delete user.passwordHash;
     }
     res.status(200).json(users);
   } catch (err) {
@@ -67,7 +66,7 @@ router.get("/:id", async (req, res) => {
           model: Conversation,
           as: "conversation",
           through: {
-            as: "conversation",
+            as: "participant",
           },
         },
         {
@@ -75,9 +74,7 @@ router.get("/:id", async (req, res) => {
         },
       ],
     });
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+
     // make avatarName into url for better use in frontend
     const getObjectParams = {
       Bucket: bucketName,
@@ -152,6 +149,9 @@ router.put(
       }
       if (req.body.middleName) {
         updatedFields.middleName = req.body.middleName;
+      }
+      if (req.body.dateOfBirth) {
+        updatedFields.dateOfBirth = req.body.dateOfBirth;
       }
       if (req.file) {
         // updating image involves deleting the old image and upload a new image

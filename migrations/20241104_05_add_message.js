@@ -22,7 +22,10 @@ module.exports = {
       file_name: {
         type: DataTypes.TEXT,
       },
-      image_name: {
+      file_url: {
+        type: DataTypes.TEXT,
+      },
+      image_url: {
         type: DataTypes.TEXT,
       },
       created_at: {

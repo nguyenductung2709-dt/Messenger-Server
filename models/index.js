@@ -8,8 +8,8 @@ const Friend = require("./friend");
 User.hasMany(Message, { foreignKey: "senderId" });
 Message.belongsTo(User, { foreignKey: "senderId" });
 
-User.hasMany(Friend, { foreignKey: "userId" });
-Friend.belongsTo(User, { foreignKey: "userId" });
+User.hasMany(Friend, { foreignKey: "friendId" });
+Friend.belongsTo(User, { foreignKey: "friendId" });
 
 Conversation.hasMany(Message, { foreignKey: "conversationId" });
 Message.belongsTo(Conversation, { foreignKey: "conversationId" });
@@ -19,6 +19,8 @@ Conversation.belongsToMany(User, {
   through: Participant,
   as: "participant_list",
 });
+
+Participant.belongsTo(User, { foreignKey: "userId" });
 
 module.exports = {
   User,

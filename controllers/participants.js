@@ -1,10 +1,49 @@
 const router = require("express").Router();
 const middleware = require("../utils/middleware");
 const { Participant, Conversation, Message, User } = require("../models/index");
+const s3 = require("../utils/s3user");
+const {
+  GetObjectCommand,
+} = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+
+const bucketName = process.env.BUCKET_NAME;
 
 router.get("/", async (req, res) => {
   try {
     const participants = await Participant.findAll({});
+    res.status(200).json(participants);
+  } catch (err) {
+    console.error("Error retrieving participants:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/:id", async (req, res) => {
+  try {
+    const participants = await Participant.findAll({
+      where: {
+        conversationId: req.params.id
+      },
+      include: [{
+        model: User, 
+        attributes: { exclude: ["passwordHash"] },
+      }]
+    });
+
+    for (const participant of participants) {
+      const user = participant.user;
+      if (user && user.avatarName) {
+        const getObjectParams = {
+          Bucket: bucketName,
+          Key: user.avatarName,
+        };
+        const command = new GetObjectCommand(getObjectParams);
+        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        user.avatarName = url;
+      }
+    }
+
     res.status(200).json(participants);
   } catch (err) {
     console.error("Error retrieving participants:", err);
@@ -56,7 +95,12 @@ router.post("/", middleware.findUserSession, async (req, res) => {
     ) {
       return res.status(404).json({ error: "Unauthorized" });
     }
-    const participant = await Participant.create(req.body);
+    const createdFields = {
+      ...req.body,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    const participant = await Participant.create(createdFields);
     res.status(201).json(participant);
   } catch (err) {
     console.error("Error creating participant:", err);

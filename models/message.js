@@ -24,7 +24,10 @@ Message.init(
     fileName: {
       type: DataTypes.TEXT,
     },
-    imageName: {
+    fileUrl: {
+      type: DataTypes.TEXT,
+    },
+    imageUrl: {
       type: DataTypes.TEXT,
     },
     createdAt: {

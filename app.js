@@ -10,8 +10,8 @@ const participantsRouter = require("./controllers/participants");
 const friendsRouter = require("./controllers/friends");
 
 //initialize express app
-const express = require("express");
-const app = express();
+const express = require('express');
+const { app } = require('./socket/socket.js');
 
 //allow cors to connect from frontend
 const cors = require("cors");

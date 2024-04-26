@@ -42,7 +42,7 @@ router.post("/login", async (req, res) => {
       userId: user.id,
       token: token,
     });
-    res.status(200).send({ token, gmail: user.gmail });
+    res.status(200).send({ id: user.id, token, gmail: user.gmail });
   } catch (err) {
     console.error("Error updating user:", err);
     res.status(500).json({ error: "Internal server error" });

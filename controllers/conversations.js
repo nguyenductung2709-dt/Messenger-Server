@@ -19,6 +19,8 @@ const {
 } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
+const { getReceiverSocketId, io } = require('../socket/socket.js');
+
 const bucketName = process.env.BUCKET_NAME;
 const randomImageName = (bytes = 32) =>
   crypto.randomBytes(bytes).toString("hex"); // generate random image name to avoid conflicts
@@ -60,6 +62,19 @@ router.get("/", async (req, res) => {
         conversation.imageName = url;
       }
     }
+    for (const conversation of conversations) {
+      if (conversation.participant_list.length > 0) {
+        for (const participant of conversation.participant_list) {
+          const getObjectParams = {
+            Bucket: bucketName,
+            Key: participant.avatarName,
+          };
+          const command = new GetObjectCommand(getObjectParams);
+          const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+          participant.avatarName = url;
+        }
+      }
+    }
     res.status(200).json(conversations);
   } catch (err) {
     res.status(500).json({ error: "Internal server error" });
@@ -92,10 +107,6 @@ router.get("/:id", async (req, res) => {
       ],
     });
 
-    if (!conversation) {
-      return res.status(404).json({ error: "Conversation not found" });
-    }
-
     // make imageName into url for better use in frontend
     if (conversation.imageName) {
       const getObjectParams = {
@@ -106,6 +117,19 @@ router.get("/:id", async (req, res) => {
       const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
       conversation.imageName = url;
     }
+
+    if (conversation.participant_list.length > 0) {
+      for (const participant of conversation.participant_list) {
+        const getObjectParams = {
+          Bucket: bucketName,
+          Key: participant.avatarName,
+        };
+        const command = new GetObjectCommand(getObjectParams);
+        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        participant.avatarName = url;
+      }
+    }
+    
 
     res.status(200).json(conversation);
   } catch (err) {
@@ -139,22 +163,67 @@ router.post(
         await s3.send(command);
 
         conversation = await Conversation.create({
+          creatorId: user.id,
           ...req.body,
           imageName: imageName,
+          createdAt: new Date(),
+          updatedAt: new Date()
         });
       } else {
         conversation = await Conversation.create({
+          creatorId: user.id,
           ...req.body,
+          createdAt: new Date(),
+          updatedAt: new Date()
         });
       }
+
       // after creating a conversation, the creator will become the first and admin of the conversation
       await Participant.create({
         conversationId: conversation.id,
         userId: conversation.creatorId,
         isAdmin: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
+
+      const participants = (req.body.participants); 
+      for (const participantId of participants) {
+        await Participant.create({
+          conversationId: conversation.id,
+          userId: participantId,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
+
+      const newConversation = await Conversation.findByPk(conversation.id, {
+        include: [
+          {
+            model: User,
+            as: "participant_list",
+            attributes: {
+              exclude: ["passwordHash", "createdAt", "updatedAt"],
+            },
+            through: {
+              attributes: {
+                exclude: ["createdAt", "updatedAt", "userId"],
+              },
+              as: "participant_details",
+            },
+          },
+        ],
+      });    
+
+      for (const participantId of participants) {
+        const receiverSocketId = getReceiverSocketId(participantId);
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit("newConversation", newConversation);
+        }
+      }
       res.status(201).json(conversation);
     } catch (err) {
+      console.log(err);
       res.status(500).json({ error: "Internal server error" });
     }
   },
@@ -229,6 +298,7 @@ router.put(
         await s3.send(updateCommand);
         updatedFields.imageName = imageName;
       }
+      updatedFields.updatedAt = new Date();
       await conversation.update(updatedFields);
       res.status(201).json(conversation);
     } catch (err) {
