@@ -51,14 +51,11 @@ jobs:
       - name: Stop PostgreSQL container
         run: docker stop postgres
 
-  tag_release:
-    needs: [deployment_pipeline]
+  release_on_controller_changes:  
     runs-on: ubuntu-20.04
     if: ${{ github.event_name == 'push' && contains(github.event.head_commit.modified, 'controllers/') }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Bump version and push tag
         uses: anothrNick/github-tag-action@1.64.0
         env:
