@@ -19,7 +19,7 @@ const {
 } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
-const { getReceiverSocketId, io } = require('../socket/socket.js');
+const { getReceiverSocketId, io } = require("../socket/socket.js");
 
 const bucketName = process.env.BUCKET_NAME;
 const randomImageName = (bytes = 32) =>
@@ -65,13 +65,15 @@ router.get("/", async (req, res) => {
     for (const conversation of conversations) {
       if (conversation.participant_list.length > 0) {
         for (const participant of conversation.participant_list) {
-          const getObjectParams = {
-            Bucket: bucketName,
-            Key: participant.avatarName,
-          };
-          const command = new GetObjectCommand(getObjectParams);
-          const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-          participant.avatarName = url;
+          if (participant.avatarName) {
+            const getObjectParams = {
+              Bucket: bucketName,
+              Key: participant.avatarName,
+            };
+            const command = new GetObjectCommand(getObjectParams);
+            const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+            participant.avatarName = url;
+          }
         }
       }
     }
@@ -107,6 +109,10 @@ router.get("/:id", async (req, res) => {
       ],
     });
 
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
     // make imageName into url for better use in frontend
     if (conversation.imageName) {
       const getObjectParams = {
@@ -120,16 +126,17 @@ router.get("/:id", async (req, res) => {
 
     if (conversation.participant_list.length > 0) {
       for (const participant of conversation.participant_list) {
-        const getObjectParams = {
-          Bucket: bucketName,
-          Key: participant.avatarName,
-        };
-        const command = new GetObjectCommand(getObjectParams);
-        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-        participant.avatarName = url;
+        if (participant.avatarName) {
+          const getObjectParams = {
+            Bucket: bucketName,
+            Key: participant.avatarName,
+          };
+          const command = new GetObjectCommand(getObjectParams);
+          const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+          participant.avatarName = url;
+        }
       }
     }
-    
 
     res.status(200).json(conversation);
   } catch (err) {
@@ -167,14 +174,14 @@ router.post(
           ...req.body,
           imageName: imageName,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         });
       } else {
         conversation = await Conversation.create({
           creatorId: user.id,
           ...req.body,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         });
       }
 
@@ -184,16 +191,16 @@ router.post(
         userId: conversation.creatorId,
         isAdmin: true,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
-      const participants = (req.body.participants); 
+      const participants = req.body.participants;
       for (const participantId of participants) {
         await Participant.create({
           conversationId: conversation.id,
           userId: participantId,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         });
       }
 
@@ -213,7 +220,7 @@ router.post(
             },
           },
         ],
-      });    
+      });
 
       for (const participantId of participants) {
         const receiverSocketId = getReceiverSocketId(participantId);
@@ -270,7 +277,11 @@ router.put(
       );
 
       // if there is no user or the user is not in the conversation, then he/she is not authorized to change conversation
-      if (!user || !userInConversation) {
+      if (
+        !user ||
+        !userInConversation ||
+        !userInConversation.participant_details.isAdmin
+      ) {
         return res.status(404).json({ error: "Unauthorized" });
       }
 

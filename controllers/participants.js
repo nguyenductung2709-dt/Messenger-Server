@@ -2,9 +2,7 @@ const router = require("express").Router();
 const middleware = require("../utils/middleware");
 const { Participant, Conversation, Message, User } = require("../models/index");
 const s3 = require("../utils/s3user");
-const {
-  GetObjectCommand,
-} = require("@aws-sdk/client-s3");
+const { GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 const bucketName = process.env.BUCKET_NAME;
@@ -23,12 +21,14 @@ router.get("/:id", async (req, res) => {
   try {
     const participants = await Participant.findAll({
       where: {
-        conversationId: req.params.id
+        conversationId: req.params.id,
       },
-      include: [{
-        model: User, 
-        attributes: { exclude: ["passwordHash"] },
-      }]
+      include: [
+        {
+          model: User,
+          attributes: { exclude: ["passwordHash"] },
+        },
+      ],
     });
 
     for (const participant of participants) {
@@ -99,7 +99,7 @@ router.post("/", middleware.findUserSession, async (req, res) => {
       ...req.body,
       createdAt: new Date(),
       updatedAt: new Date(),
-    }
+    };
     const participant = await Participant.create(createdFields);
     res.status(201).json(participant);
   } catch (err) {

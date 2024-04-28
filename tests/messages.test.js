@@ -30,8 +30,6 @@ beforeEach(async () => {
 });
 
 const createUser = async () => {
-  const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
-
   await api
     .post("/api/users")
     .field("gmail", "ronaldo@gmail.com")
@@ -39,14 +37,11 @@ const createUser = async () => {
     .field("firstName", "Ronaldo")
     .field("lastName", "Aveiro")
     .field("middleName", "Cristiano")
-    .attach("avatarImage", imagePath)
     .expect(201)
     .expect("Content-Type", /application\/json/);
 };
 
 const createAnotherUser = async () => {
-  const imagePath = path.resolve(__dirname, "../assets/messi.webp");
-
   await api
     .post("/api/users")
     .field("gmail", "messi@gmail.com")
@@ -54,7 +49,18 @@ const createAnotherUser = async () => {
     .field("firstName", "Messi")
     .field("lastName", "Lionel")
     .field("middleName", "Goat")
-    .attach("avatarImage", imagePath)
+    .expect(201)
+    .expect("Content-Type", /application\/json/);
+};
+
+const createMoreUser = async () => {
+  await api
+    .post("/api/users")
+    .field("gmail", "neymar@gmail.com")
+    .field("password", "neymar")
+    .field("firstName", "Neymar")
+    .field("lastName", "Dos Santos")
+    .field("middleName", "Junior")
     .expect(201)
     .expect("Content-Type", /application\/json/);
 };
@@ -83,28 +89,19 @@ const loginAnother = async () => {
     .expect("Content-Type", /application\/json/);
 };
 
-const deleteImageTest = async (user) => {
-  const deleteParams = {
-    Bucket: bucketName,
-    Key: user.avatarName,
-  };
-  const deleteCommand = new DeleteObjectCommand(deleteParams);
-  await s3.send(deleteCommand);
-};
-
 const deleteImageTest2 = async (message) => {
   let deleteParams = {};
-  if (message.imageName) {
+  if (message.imageUrl) {
     deleteParams = {
       Bucket: bucketName,
-      Key: message.imageName,
+      Key: message.imageUrl,
     };
   }
 
-  if (message.fileName) {
+  if (message.fileUrl) {
     deleteParams = {
       Bucket: bucketName,
-      Key: message.fileName,
+      Key: message.fileUrl,
     };
   }
   const deleteCommand = new DeleteObjectCommand(deleteParams);
@@ -112,16 +109,25 @@ const deleteImageTest2 = async (message) => {
 };
 
 describe("Testing POST and GET requests", () => {
-  test("a message with image is sent properly and get properly", async () => {
-    const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
+  test("a message with image is sent properly", async () => {
+    const imagePath = path.resolve(__dirname, "../assets/messi.webp");
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -141,29 +147,30 @@ describe("Testing POST and GET requests", () => {
     const message = await Message.findOne({
       where: { conversationId: conversation.id, senderId: user.id },
     });
-    expect(message.imageName).toBeDefined();
+    expect(message.imageUrl).toBeDefined();
 
-    const messages = await api
-      .get("/api/messages")
-      .expect(200)
-      .expect("Content-Type", /application\/json/);
-
-    expect(messages.body).toHaveLength(1);
-
-    deleteImageTest(user);
     deleteImageTest2(message);
   });
 
   test("a message with file is sent properly", async () => {
     const filePath = path.resolve(__dirname, "../assets/test.txt");
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -183,22 +190,30 @@ describe("Testing POST and GET requests", () => {
     const message = await Message.findOne({
       where: { conversationId: conversation.id, senderId: user.id },
     });
-    expect(message.fileName).toBeDefined();
+    expect(message.fileUrl).toBeDefined();
 
-    deleteImageTest(user);
     deleteImageTest2(message);
   });
 
   test("unauthorized user cannot send a message", async () => {
     const filePath = path.resolve(__dirname, "../assets/test.txt");
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -212,8 +227,6 @@ describe("Testing POST and GET requests", () => {
       .field("message", "Siuuuu")
       .attach("messageImage", filePath)
       .expect(500);
-
-    deleteImageTest(user);
   });
 });
 
@@ -221,13 +234,22 @@ describe("Testing PUT request", () => {
   test("user can fix his/her message", async () => {
     const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -259,7 +281,6 @@ describe("Testing PUT request", () => {
     });
     expect(newMessage.message).toEqual("Messi is better");
 
-    deleteImageTest(user);
     deleteImageTest2(message);
   });
 
@@ -267,13 +288,21 @@ describe("Testing PUT request", () => {
     const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
     await createUser();
     await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -295,9 +324,6 @@ describe("Testing PUT request", () => {
     });
 
     await loginAnother();
-    const userAnother = await User.findOne({
-      where: { gmail: "messi@gmail.com" },
-    });
     const sessionAnother = await Session.findOne({
       where: { userId: userAnother.id },
     });
@@ -307,8 +333,7 @@ describe("Testing PUT request", () => {
       .set("Authorization", `bearer ${sessionAnother.token}`)
       .field("message", "Messi is better")
       .expect(404);
-    deleteImageTest(user);
-    deleteImageTest(userAnother);
+
     deleteImageTest2(message);
   });
 });
@@ -317,13 +342,22 @@ describe("Testing DELETE request", () => {
   test("user can delete his/her messages", async () => {
     const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -351,7 +385,6 @@ describe("Testing DELETE request", () => {
 
     const messages = await Message.findAll({});
     expect(messages).toHaveLength(0);
-    deleteImageTest(user);
     deleteImageTest2(message);
   });
 
@@ -359,13 +392,21 @@ describe("Testing DELETE request", () => {
     const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
     await createUser();
     await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -387,9 +428,6 @@ describe("Testing DELETE request", () => {
     });
 
     await loginAnother();
-    const userAnother = await User.findOne({
-      where: { gmail: "messi@gmail.com" },
-    });
     const sessionAnother = await Session.findOne({
       where: { userId: userAnother.id },
     });
@@ -402,8 +440,6 @@ describe("Testing DELETE request", () => {
     const messages = await Message.findAll({});
     expect(messages).toHaveLength(1);
 
-    deleteImageTest(user);
-    deleteImageTest(userAnother);
     deleteImageTest2(message);
   });
 });

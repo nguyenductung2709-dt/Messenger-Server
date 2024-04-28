@@ -10,17 +10,12 @@ const participantsRouter = require("./controllers/participants");
 const friendsRouter = require("./controllers/friends");
 
 //initialize express app
-const express = require('express');
-const { app } = require('./socket/socket.js');
+const express = require("express");
+const { app } = require("./socket/socket.js");
 
 //allow cors to connect from frontend
 const cors = require("cors");
-app.use(cors(
-    {
-        origin: "http://localhost:5173",
-        credentials: true
-    }
-));
+app.use(cors());
 require("dotenv").config();
 app.use(express.json());
 app.use("/api/users", usersRouter);

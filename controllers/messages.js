@@ -18,7 +18,7 @@ const {
 } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
-const { getReceiverSocketId, io } = require('../socket/socket.js');
+const { getReceiverSocketId, io } = require("../socket/socket.js");
 
 const bucketName = process.env.BUCKET_NAME;
 
@@ -78,7 +78,7 @@ router.get("/:id", async (req, res) => {
   try {
     const messages = await Message.findAll({
       where: {
-        conversationId: req.params.id
+        conversationId: req.params.id,
       },
       include: [
         {
@@ -209,9 +209,10 @@ router.post(
         const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
         message.fileUrl = url;
       }
-    
-      
-      const participantIds = conversation.participant_list.map(participant => participant.id);
+
+      const participantIds = conversation.participant_list.map(
+        (participant) => participant.id,
+      );
 
       for (const participantId of participantIds) {
         const receiverSocketId = getReceiverSocketId(participantId);

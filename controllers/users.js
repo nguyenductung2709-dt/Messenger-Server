@@ -40,16 +40,19 @@ router.get("/", async (req, res) => {
         },
       ],
     });
-    // make avatarName into url for better use in frontend
+
     for (const user of users) {
-      const getObjectParams = {
-        Bucket: bucketName,
-        Key: user.avatarName,
-      };
-      const command = new GetObjectCommand(getObjectParams);
-      const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-      user.avatarName = url;
+      if (user.avatarName) {
+        const getObjectParams = {
+          Bucket: bucketName,
+          Key: user.avatarName,
+        };
+        const command = new GetObjectCommand(getObjectParams);
+        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        user.avatarName = url;
+      }
     }
+
     res.status(200).json(users);
   } catch (err) {
     console.error("Error updating user:", err);
@@ -75,14 +78,20 @@ router.get("/:id", async (req, res) => {
       ],
     });
 
-    // make avatarName into url for better use in frontend
-    const getObjectParams = {
-      Bucket: bucketName,
-      Key: user.avatarName,
-    };
-    const command = new GetObjectCommand(getObjectParams);
-    const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-    user.avatarName = url;
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.avatarName) {
+      const getObjectParams = {
+        Bucket: bucketName,
+        Key: user.avatarName,
+      };
+      const command = new GetObjectCommand(getObjectParams);
+      const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+      user.avatarName = url;
+    }
+
     res.status(200).json(user);
   } catch (err) {
     console.error("Error getting user:", err);
@@ -92,28 +101,35 @@ router.get("/:id", async (req, res) => {
 
 router.post("/", upload.single("avatarImage"), async (req, res) => {
   try {
-    const imageName = randomImageName();
+    let imageName = null;
 
-    // handle uploading images to AWS S3
-    const params = {
-      Bucket: bucketName,
-      Key: imageName,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype,
-    };
+    if (req.file) {
+      imageName = randomImageName();
 
-    const command = new PutObjectCommand(params);
-    await s3.send(command);
+      const params = {
+        Bucket: bucketName,
+        Key: imageName,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+      };
 
-    // hash password with bcrypt
+      const command = new PutObjectCommand(params);
+      await s3.send(command);
+    }
+
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(req.body.password, saltRounds);
 
-    const user = await User.create({
+    const userData = {
       ...req.body,
       passwordHash,
-      avatarName: imageName,
-    });
+    };
+
+    if (imageName) {
+      userData.avatarName = imageName;
+    }
+
+    const user = await User.create(userData);
     res.status(201).json(user);
   } catch (err) {
     console.error("Error updating user:", err);

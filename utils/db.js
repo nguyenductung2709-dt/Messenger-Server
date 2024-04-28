@@ -3,11 +3,11 @@ const { DATABASE_URL } = require("./config");
 const { Umzug, SequelizeStorage } = require("umzug");
 
 const sequelize = new Sequelize(DATABASE_URL, {
-  dialect: 'postgresql',
+  dialect: "postgresql",
 });
 
 sequelize.options.logging = (msg) => {
-  if (msg.startsWith('error')) {
+  if (msg.startsWith("error")) {
     console.log(msg);
   }
 };

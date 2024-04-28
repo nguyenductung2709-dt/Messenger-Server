@@ -9,10 +9,6 @@ const {
 const supertest = require("supertest");
 const app = require("../app");
 const api = supertest(app);
-const path = require("path");
-const s3 = require("../utils/s3user");
-const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
-const bucketName = process.env.BUCKET_NAME;
 const { connectToDatabase } = require("../utils/db");
 
 beforeEach(async () => {
@@ -30,8 +26,6 @@ beforeEach(async () => {
 });
 
 const createUser = async () => {
-  const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
-
   await api
     .post("/api/users")
     .field("gmail", "ronaldo@gmail.com")
@@ -39,7 +33,6 @@ const createUser = async () => {
     .field("firstName", "Ronaldo")
     .field("lastName", "Aveiro")
     .field("middleName", "Cristiano")
-    .attach("avatarImage", imagePath)
     .expect(201)
     .expect("Content-Type", /application\/json/);
 };
@@ -56,15 +49,6 @@ const login = async () => {
     .expect("Content-Type", /application\/json/);
 };
 
-const deleteImageTest = async (user) => {
-  const deleteParams = {
-    Bucket: bucketName,
-    Key: user.avatarName,
-  };
-  const deleteCommand = new DeleteObjectCommand(deleteParams);
-  await s3.send(deleteCommand);
-};
-
 describe("Test logout functionality", () => {
   test("login and logout functionality", async () => {
     await createUser();
@@ -77,6 +61,5 @@ describe("Test logout functionality", () => {
       .expect(200);
     const sessionNew = await Session.findAll({});
     expect(sessionNew).toHaveLength(0);
-    deleteImageTest(user);
   });
 });

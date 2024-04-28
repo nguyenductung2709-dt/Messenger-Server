@@ -19,7 +19,7 @@ jobs:
       - name: Check URL health - Users
         uses: jtalk/url-health-check-action@v4
         with:
-          url: "https://messenger-server.fly.dev/api/users"
+          url: "https://messenger-server-platform.fly.dev/api/users"
           follow-redirect: false
           max-attempts: 3
           retry-delay: 5s
@@ -28,7 +28,7 @@ jobs:
       - name: Check URL health - Conversations
         uses: jtalk/url-health-check-action@v4
         with:
-          url: "https://messenger-server.fly.dev/api/conversations"
+          url: "https://messenger-server-platform.fly.dev/api/conversations"
           follow-redirect: false
           max-attempts: 3
           retry-delay: 5s
@@ -37,7 +37,7 @@ jobs:
       - name: Check URL health - Friends
         uses: jtalk/url-health-check-action@v4
         with:
-          url: "https://messenger-server.fly.dev/api/friends"
+          url: "https://messenger-server-platform.fly.dev/api/friends"
           follow-redirect: false
           max-attempts: 3
           retry-delay: 5s
@@ -46,7 +46,7 @@ jobs:
       - name: Check URL health - Messages
         uses: jtalk/url-health-check-action@v4
         with:
-          url: "https://messenger-server.fly.dev/api/messages"
+          url: "https://messenger-server-platform.fly.dev/api/messages"
           follow-redirect: false
           max-attempts: 3
           retry-delay: 5s
@@ -55,7 +55,7 @@ jobs:
       - name: Check URL health - Participants
         uses: jtalk/url-health-check-action@v4
         with:
-          url: "https://messenger-server.fly.dev/api/participants"
+          url: "https://messenger-server-platform.fly.dev/api/participants"
           follow-redirect: false
           max-attempts: 3
           retry-delay: 5s

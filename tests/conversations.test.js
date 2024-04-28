@@ -9,10 +9,6 @@ const {
 const supertest = require("supertest");
 const app = require("../app");
 const api = supertest(app);
-const path = require("path");
-const s3 = require("../utils/s3user");
-const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
-const bucketName = process.env.BUCKET_NAME;
 const { connectToDatabase } = require("../utils/db");
 
 beforeEach(async () => {
@@ -30,8 +26,6 @@ beforeEach(async () => {
 });
 
 const createUser = async () => {
-  const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
-
   await api
     .post("/api/users")
     .field("gmail", "ronaldo@gmail.com")
@@ -39,14 +33,11 @@ const createUser = async () => {
     .field("firstName", "Ronaldo")
     .field("lastName", "Aveiro")
     .field("middleName", "Cristiano")
-    .attach("avatarImage", imagePath)
     .expect(201)
     .expect("Content-Type", /application\/json/);
 };
 
 const createAnotherUser = async () => {
-  const imagePath = path.resolve(__dirname, "../assets/messi.webp");
-
   await api
     .post("/api/users")
     .field("gmail", "messi@gmail.com")
@@ -54,7 +45,18 @@ const createAnotherUser = async () => {
     .field("firstName", "Messi")
     .field("lastName", "Lionel")
     .field("middleName", "Goat")
-    .attach("avatarImage", imagePath)
+    .expect(201)
+    .expect("Content-Type", /application\/json/);
+};
+
+const createMoreUser = async () => {
+  await api
+    .post("/api/users")
+    .field("gmail", "neymar@gmail.com")
+    .field("password", "neymar")
+    .field("firstName", "Neymar")
+    .field("lastName", "Dos Santos")
+    .field("middleName", "Junior")
     .expect(201)
     .expect("Content-Type", /application\/json/);
 };
@@ -83,47 +85,54 @@ const loginAnother = async () => {
     .expect("Content-Type", /application\/json/);
 };
 
-const deleteImageTest = async (user) => {
-  const deleteParams = {
-    Bucket: bucketName,
-    Key: user.avatarName,
-  };
-  const deleteCommand = new DeleteObjectCommand(deleteParams);
-  await s3.send(deleteCommand);
-};
-
 describe("Addition of a new conversation, correctly get a conversation", () => {
   test("adding a new conversation", async () => {
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
     const conversation = await Conversation.findAll({});
     expect(conversation).toHaveLength(1);
-
-    deleteImageTest(user);
   });
 
   test("unauthorized cannot create conversation", async () => {
-    await api.post("/api/conversations").field("creatorId", 1).expect(500);
+    await api.post("/api/conversations").field("title", "xoaixinh").expect(500);
   });
 
   test("conversation is get correctly", async () => {
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -132,20 +141,28 @@ describe("Addition of a new conversation, correctly get a conversation", () => {
       .expect(200)
       .expect("Content-Type", /application\/json/);
     expect(conversations.body).toHaveLength(1);
-    deleteImageTest(user);
   });
 });
 
 describe("Viewing a specific conversation", () => {
   test("A specific conversation is get correctly", async () => {
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -157,37 +174,53 @@ describe("Viewing a specific conversation", () => {
       .expect(200)
       .expect("Content-Type", /application\/json/);
     expect(conversationFound.body.id).toEqual(conversation.id);
-    deleteImageTest(user);
   });
 
   test("fails with status code 404 if conversation does not exist", async () => {
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
     const validNonexistingId = 1000000;
     await api.get(`/api/conversations/${validNonexistingId}`).expect(404);
-    deleteImageTest(user);
   });
 });
 
 describe("Changing information about a conversation", () => {
   test("user in a conversation can change information", async () => {
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -206,29 +239,35 @@ describe("Changing information about a conversation", () => {
       where: { creatorId: user.id },
     });
     expect(newConversation.title).toEqual("TungDz");
-    deleteImageTest(user);
   });
 
   test("user not in conversation cannot change information of the conversation", async () => {
     await createUser();
     await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
     const conversation = await Conversation.findOne({
       where: { creatorId: user.id },
     });
+
     await loginAnother();
-    const userAnother = await User.findOne({
-      where: { gmail: "messi@gmail.com" },
-    });
+
     const sessionAnother = await Session.findOne({
       where: { userId: userAnother.id },
     });
@@ -238,19 +277,26 @@ describe("Changing information about a conversation", () => {
       .set("Authorization", `bearer ${sessionAnother.token}`)
       .field("title", "TungDz")
       .expect(404);
-    deleteImageTest(user);
-    deleteImageTest(userAnother);
   });
 
   test("fails with status code 404 if the conversation does not exist", async () => {
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -261,20 +307,28 @@ describe("Changing information about a conversation", () => {
       .set("Authorization", `bearer ${session.token}`)
       .field("title", "TungDz")
       .expect(404);
-    deleteImageTest(user);
   });
 });
 
 describe("Admin can delete a conversation", () => {
   test("delete a conversation", async () => {
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -289,18 +343,26 @@ describe("Admin can delete a conversation", () => {
 
     const conversations = await Conversation.findAll({});
     expect(conversations).toHaveLength(0);
-    deleteImageTest(user);
   });
 
   test("fails with status code 404 if the conversation does not exist", async () => {
     await createUser();
+    await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -311,19 +373,26 @@ describe("Admin can delete a conversation", () => {
       .set("Authorization", `bearer ${session.token}`)
       .field("title", "TungDz")
       .expect(404);
-    deleteImageTest(user);
   });
 
   test("non-admin user cannot delete a conversation", async () => {
     await createUser();
     await createAnotherUser();
+    await createMoreUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
+    const userAnother = await User.findOne({
+      where: { gmail: "messi@gmail.com" },
+    });
+    const userMore = await User.findOne({
+      where: { gmail: "neymar@gmail.com" },
+    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/conversations")
       .set("Authorization", `bearer ${session.token}`)
-      .field("creatorId", user.id)
+      .field("title", "xoaixinh")
+      .field("participants", [userAnother.id, userMore.id])
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -331,9 +400,6 @@ describe("Admin can delete a conversation", () => {
       where: { creatorId: user.id },
     });
     await loginAnother();
-    const userAnother = await User.findOne({
-      where: { gmail: "messi@gmail.com" },
-    });
     const sessionAnother = await Session.findOne({
       where: { userId: userAnother.id },
     });
@@ -349,7 +415,5 @@ describe("Admin can delete a conversation", () => {
 
     const conversations = await Conversation.findAll({});
     expect(conversations).toHaveLength(1);
-    deleteImageTest(user);
-    deleteImageTest(userAnother);
   });
 });

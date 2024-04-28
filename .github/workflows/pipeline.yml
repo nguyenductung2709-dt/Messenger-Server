@@ -40,6 +40,9 @@ jobs:
       - name: Run tests
         run: npm run test
 
+      - name: Run lint with Prettier
+        run: npm run prettier
+
       - name: Deploy to Fly.io
         uses: superfly/flyctl-actions@v1
         with:
@@ -55,9 +58,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-      
+
       - name: Bump version and push tag
         uses: anothrNick/github-tag-action@1.64.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      

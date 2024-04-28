@@ -1,10 +1,10 @@
-# fly.toml app configuration file generated for messenger-server on 2024-04-14T17:20:19+03:00
+# fly.toml app configuration file generated for messenger-server-platform on 2024-04-27T00:59:21+03:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'messenger-server'
-primary_region = 'arn'
+app = 'messenger-server-platform'
+primary_region = 'ams'
 
 [build]
 

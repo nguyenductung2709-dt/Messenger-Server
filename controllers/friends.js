@@ -1,13 +1,17 @@
-const { Friend, Conversation, Participant, User, Message } = require("../models/index");
+const {
+  Friend,
+  Conversation,
+  Participant,
+  User,
+  Message,
+} = require("../models/index");
 const router = require("express").Router();
 const middleware = require("../utils/middleware");
 const s3 = require("../utils/s3user");
-const {
-  GetObjectCommand,
-} = require("@aws-sdk/client-s3");
+const { GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
-const { getReceiverSocketId, io } = require('../socket/socket.js');
+const { getReceiverSocketId, io } = require("../socket/socket.js");
 
 const bucketName = process.env.BUCKET_NAME;
 
@@ -34,13 +38,15 @@ router.get("/:id", async (req, res) => {
     });
 
     for (const friend of friends) {
-      const getObjectParams = {
-        Bucket: bucketName,
-        Key: friend.user.avatarName,
-      };
-      const command = new GetObjectCommand(getObjectParams);
-      const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-      friend.user.avatarName = url;
+      if (friend.user.avatarName) {
+        const getObjectParams = {
+          Bucket: bucketName,
+          Key: friend.user.avatarName,
+        };
+        const command = new GetObjectCommand(getObjectParams);
+        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        friend.user.avatarName = url;
+      }
     }
     res.status(200).json(friends);
   } catch (err) {
@@ -65,12 +71,16 @@ router.post("/", middleware.findUserSession, async (req, res) => {
     // Find the user by their Gmail address
     const friend = await User.findOne({ where: { gmail: gmail } });
     if (!friend) {
-      return res.status(404).json({ error: "User with the provided Gmail address not found" });
+      return res
+        .status(404)
+        .json({ error: "User with the provided Gmail address not found" });
     }
 
     // Ensure that the found user is not the same as the authenticated user
     if (friend.id === user.id) {
-      return res.status(400).json({ error: "You cannot add yourself as a friend" });
+      return res
+        .status(400)
+        .json({ error: "You cannot add yourself as a friend" });
     }
 
     // Check if the relationship already exists
@@ -123,7 +133,7 @@ router.post("/", middleware.findUserSession, async (req, res) => {
           },
         },
       ],
-    });    
+    });
 
     if (newConversation.imageName) {
       const getObjectParams = {
@@ -137,17 +147,18 @@ router.post("/", middleware.findUserSession, async (req, res) => {
 
     if (newConversation.participant_list.length > 0) {
       for (const participant of newConversation.participant_list) {
-        const getObjectParams = {
-          Bucket: bucketName,
-          Key: participant.avatarName,
-        };
-        const command = new GetObjectCommand(getObjectParams);
-        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-        participant.avatarName = url;
+        if (participant.imageName) {
+          const getObjectParams = {
+            Bucket: bucketName,
+            Key: participant.avatarName,
+          };
+          const command = new GetObjectCommand(getObjectParams);
+          const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+          participant.avatarName = url;
+        }
       }
     }
 
-    
     const receiverFriendSocketId = getReceiverSocketId(friend.id);
     const newFriend = await Friend.findOne({
       where: { userId: friend.id, friendId: user.id },
@@ -159,20 +170,23 @@ router.post("/", middleware.findUserSession, async (req, res) => {
       ],
     });
 
-    const getObjectParams = {
-      Bucket: bucketName,
-      Key: newFriend.user.avatarName,
-    };
-    const command = new GetObjectCommand(getObjectParams);
-    const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-    newFriend.user.avatarName = url;
-    
-    
+    if (newFriend.user.avatarName) {
+      const getObjectParams = {
+        Bucket: bucketName,
+        Key: newFriend.user.avatarName,
+      };
+      const command = new GetObjectCommand(getObjectParams);
+      const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+      newFriend.user.avatarName = url;
+    }
+
     if (receiverFriendSocketId) {
       io.to(receiverFriendSocketId).emit("newFriend", newFriend);
     }
-    
-    const participantIds = newConversation.participant_list.map(participant => participant.id);
+
+    const participantIds = newConversation.participant_list.map(
+      (participant) => participant.id,
+    );
 
     for (const participantId of participantIds) {
       const receiverSocketId = getReceiverSocketId(participantId);
@@ -180,14 +194,13 @@ router.post("/", middleware.findUserSession, async (req, res) => {
         io.to(receiverSocketId).emit("newConversation", newConversation);
       }
     }
-        
+
     res.status(201).json(firstFriend);
   } catch (err) {
     console.error("Error creating friend:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
-
 
 router.delete("/:id", middleware.findUserSession, async (req, res) => {
   try {
