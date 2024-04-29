@@ -132,7 +132,7 @@ describe("Testing POST and GET request", () => {
     await api
       .post("/api/participants")
       .set("Authorization", `bearer ${session.token}`)
-      .send({ conversationId: conversation.id, userId: fourthUser.id })
+      .send({ conversationId: conversation.id, gmail: fourthUser.gmail })
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -180,7 +180,7 @@ describe("Testing PUT request", () => {
     await api
       .post("/api/participants")
       .set("Authorization", `bearer ${session.token}`)
-      .send({ conversationId: conversation.id, userId: fourthUser.id })
+      .send({ conversationId: conversation.id, gmail: fourthUser.gmail })
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -234,7 +234,7 @@ describe("Testing PUT request", () => {
     await api
       .post("/api/participants")
       .set("Authorization", `bearer ${session.token}`)
-      .send({ conversationId: conversation.id, userId: fourthUser.id })
+      .send({ conversationId: conversation.id, gmail: fourthUser.gmail })
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -290,7 +290,7 @@ describe("Testing DELETE request", () => {
     await api
       .post("/api/participants")
       .set("Authorization", `bearer ${session.token}`)
-      .send({ conversationId: conversation.id, userId: fourthUser.id })
+      .send({ conversationId: conversation.id, gmail: fourthUser.gmail })
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
@@ -341,7 +341,7 @@ describe("Testing DELETE request", () => {
     await api
       .post("/api/participants")
       .set("Authorization", `bearer ${session.token}`)
-      .send({ conversationId: conversation.id, userId: fourthUser.id })
+      .send({ conversationId: conversation.id, gmail: fourthUser.gmail })
       .expect(201)
       .expect("Content-Type", /application\/json/);
 

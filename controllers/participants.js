@@ -96,8 +96,8 @@ router.post("/", middleware.findUserSession, async (req, res) => {
       return res.status(404).json({ error: "Unauthorized" });
     }
 
-    const gmail = req.body.gmail
-    
+    const gmail = req.body.gmail;
+
     const participant = await User.findOne({
       where: {
         gmail: gmail,
@@ -105,7 +105,7 @@ router.post("/", middleware.findUserSession, async (req, res) => {
     });
 
     const createdFields = {
-      ...req.body,
+      conversationId: req.body.conversationId,
       userId: participant.id,
       createdAt: new Date(),
       updatedAt: new Date(),
