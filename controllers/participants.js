@@ -95,13 +95,23 @@ router.post("/", middleware.findUserSession, async (req, res) => {
     ) {
       return res.status(404).json({ error: "Unauthorized" });
     }
+
+    const gmail = req.body.gmail
+    
+    const participant = await User.findOne({
+      where: {
+        gmail: gmail,
+      },
+    });
+
     const createdFields = {
       ...req.body,
+      userId: participant.id,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    const participant = await Participant.create(createdFields);
-    res.status(201).json(participant);
+    const participantCreated = await Participant.create(createdFields);
+    res.status(201).json(participantCreated);
   } catch (err) {
     console.error("Error creating participant:", err);
     res.status(500).json({ error: "Internal server error" });
