@@ -1,147 +1,114 @@
+/* eslint-disable no-param-reassign */
 const router = require("express").Router();
+const multer = require("multer");
 const { Conversation, Message, User, Participant } = require("../models/index");
 const middleware = require("../utils/middleware");
 
 // library to handle uploading files
-const multer = require("multer");
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
-const crypto = require("crypto"); // used to generate random string
-const bcrypt = require("bcrypt"); // used to encrypt passwords
-
-//AWS S3 SDK library to upload and get images from AWS S3
-const s3 = require("../utils/s3user");
 const {
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} = require("@aws-sdk/client-s3");
-const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
-
-const { getReceiverSocketId, io } = require("../socket/socket.js");
-
-const bucketName = process.env.BUCKET_NAME;
-const randomImageName = (bytes = 32) =>
-  crypto.randomBytes(bytes).toString("hex"); // generate random image name to avoid conflicts
+  randomFileName,
+  uploadFile,
+  generateSignedUrl,
+} = require("../utils/aws-sdk");
+const { getReceiverSocketId, io } = require("../socket/socket");
 
 router.get("/", async (req, res) => {
-  try {
-    const conversations = await Conversation.findAll({
-      include: [
-        {
-          model: Message,
-          attributes: {
-            exclude: ["createdAt", "updatedAt"],
-          },
+  const conversations = await Conversation.findAll({
+    include: [
+      {
+        model: Message,
+        attributes: {
+          exclude: ["createdAt", "updatedAt"],
         },
-        {
-          model: User,
-          as: "participant_list",
-          attributes: {
-            exclude: ["passwordHash", "createdAt", "updatedAt"],
-          },
-          through: {
-            attributes: {
-              exclude: ["createdAt", "updatedAt", "userId"],
-            },
-            as: "participant_details",
-          },
+      },
+      {
+        model: User,
+        as: "participant_list",
+        attributes: {
+          exclude: ["passwordHash", "createdAt", "updatedAt"],
         },
-      ],
-    });
-    // make imageName into url for better use in frontend
-    for (const conversation of conversations) {
+        through: {
+          attributes: {
+            exclude: ["createdAt", "updatedAt", "userId"],
+          },
+          as: "participant_details",
+        },
+      },
+    ],
+  });
+  // make imageName into url for better use in frontend
+  await Promise.all(
+    conversations.map(async (conversation) => {
       if (conversation.imageName) {
-        const getObjectParams = {
-          Bucket: bucketName,
-          Key: conversation.imageName,
-        };
-        const command = new GetObjectCommand(getObjectParams);
-        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-        conversation.imageName = url;
+        conversation.imageName = await generateSignedUrl(
+          conversation.imageName,
+        );
       }
-    }
-    for (const conversation of conversations) {
       if (conversation.participant_list.length > 0) {
-        for (const participant of conversation.participant_list) {
-          if (participant.avatarName) {
-            const getObjectParams = {
-              Bucket: bucketName,
-              Key: participant.avatarName,
-            };
-            const command = new GetObjectCommand(getObjectParams);
-            const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-            participant.avatarName = url;
-          }
-        }
+        await Promise.all(
+          conversation.participant_list.map(async (participant) => {
+            if (participant.avatarName) {
+              participant.avatarName = await generateSignedUrl(
+                participant.avatarName,
+              );
+            }
+          }),
+        );
       }
-    }
-    res.status(200).json(conversations);
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
-  }
+    }),
+  );
+  return res.status(200).json(conversations);
 });
 
 router.get("/:id", async (req, res) => {
-  try {
-    const conversation = await Conversation.findByPk(req.params.id, {
-      include: [
-        {
-          model: Message,
-          attributes: {
-            exclude: ["createdAt", "updatedAt"],
-          },
+  const conversation = await Conversation.findByPk(req.params.id, {
+    include: [
+      {
+        model: Message,
+        attributes: {
+          exclude: ["createdAt", "updatedAt"],
         },
-        {
-          model: User,
-          as: "participant_list",
-          attributes: {
-            exclude: ["passwordHash", "createdAt", "updatedAt"],
-          },
-          through: {
-            attributes: {
-              exclude: ["createdAt", "updatedAt", "userId"],
-            },
-            as: "participant_details",
-          },
+      },
+      {
+        model: User,
+        as: "participant_list",
+        attributes: {
+          exclude: ["passwordHash", "createdAt", "updatedAt"],
         },
-      ],
-    });
+        through: {
+          attributes: {
+            exclude: ["createdAt", "updatedAt", "userId"],
+          },
+          as: "participant_details",
+        },
+      },
+    ],
+  });
 
-    if (!conversation) {
-      return res.status(404).json({ error: "Conversation not found" });
-    }
-
-    // make imageName into url for better use in frontend
-    if (conversation.imageName) {
-      const getObjectParams = {
-        Bucket: bucketName,
-        Key: conversation.imageName,
-      };
-      const command = new GetObjectCommand(getObjectParams);
-      const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-      conversation.imageName = url;
-    }
-
-    if (conversation.participant_list.length > 0) {
-      for (const participant of conversation.participant_list) {
-        if (participant.avatarName) {
-          const getObjectParams = {
-            Bucket: bucketName,
-            Key: participant.avatarName,
-          };
-          const command = new GetObjectCommand(getObjectParams);
-          const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-          participant.avatarName = url;
-        }
-      }
-    }
-
-    res.status(200).json(conversation);
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+  if (!conversation) {
+    return res.status(404).json({ error: "Conversation not found" });
   }
+
+  // make imageName into url for better use in frontend
+  if (conversation.imageName) {
+    conversation.imageName = await generateSignedUrl(conversation.imageName);
+  }
+
+  if (conversation.participant_list.length > 0) {
+    await Promise.all(
+      conversation.participant_list.map(async (participant) => {
+        if (participant.avatarName) {
+          participant.avatarName = await generateSignedUrl(
+            participant.avatarName,
+          );
+        }
+      }),
+    );
+  }
+  return res.status(200).json(conversation);
 });
 
 router.post(
@@ -149,90 +116,84 @@ router.post(
   upload.single("groupImage"),
   middleware.findUserSession,
   async (req, res) => {
-    try {
-      const user = req.user;
-      if (!user) {
-        return res.status(404).json({ error: "Unauthorized" });
-      }
+    const { user } = req;
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-      let conversation;
+    let conversation;
 
-      if (req.file) {
-        // handle uploading new groupImage
-        const imageName = randomImageName();
-        const params = {
-          Bucket: bucketName,
-          Key: imageName,
-          Body: req.file.buffer,
-          ContentType: req.file.mimetype,
-        };
-        const command = new PutObjectCommand(params);
-        await s3.send(command);
+    if (req.file) {
+      // handle uploading new groupImage
+      const imageName = randomFileName();
+      await uploadFile(imageName, req.file.buffer, req.file.mimetype);
 
-        conversation = await Conversation.create({
-          creatorId: user.id,
-          ...req.body,
-          imageName: imageName,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-      } else {
-        conversation = await Conversation.create({
-          creatorId: user.id,
-          ...req.body,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-      }
-
-      // after creating a conversation, the creator will become the first and admin of the conversation
-      await Participant.create({
-        conversationId: conversation.id,
-        userId: conversation.creatorId,
-        isAdmin: true,
+      conversation = await Conversation.create({
+        creatorId: user.id,
+        ...req.body,
+        imageName,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+    } else {
+      conversation = await Conversation.create({
+        creatorId: user.id,
+        ...req.body,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
 
-      const participants = req.body.participants;
-      for (const participantId of participants) {
+    // after creating a conversation, the creator will become the first and admin of the conversation
+    await Participant.create({
+      conversationId: conversation.id,
+      userId: conversation.creatorId,
+      isAdmin: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const { participants } = req.body;
+
+    await Promise.all(
+      participants.map(async (participantId) => {
         await Participant.create({
           conversationId: conversation.id,
           userId: participantId,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
-      }
+      }),
+    );
 
-      const newConversation = await Conversation.findByPk(conversation.id, {
-        include: [
-          {
-            model: User,
-            as: "participant_list",
-            attributes: {
-              exclude: ["passwordHash", "createdAt", "updatedAt"],
-            },
-            through: {
-              attributes: {
-                exclude: ["createdAt", "updatedAt", "userId"],
-              },
-              as: "participant_details",
-            },
+    const newConversation = await Conversation.findByPk(conversation.id, {
+      include: [
+        {
+          model: User,
+          as: "participant_list",
+          attributes: {
+            exclude: ["passwordHash", "createdAt", "updatedAt"],
           },
-        ],
-      });
+          through: {
+            attributes: {
+              exclude: ["createdAt", "updatedAt", "userId"],
+            },
+            as: "participant_details",
+          },
+        },
+      ],
+    });
 
-      for (const participantId of participants) {
+    await Promise.all(
+      participants.map(async (participantId) => {
         const receiverSocketId = getReceiverSocketId(participantId);
         if (receiverSocketId) {
           io.to(receiverSocketId).emit("newConversation", newConversation);
         }
-      }
-      res.status(201).json(conversation);
-    } catch (err) {
-      console.log(err);
-      res.status(500).json({ error: "Internal server error" });
-    }
+      }),
+    );
+
+    return res.status(201).json(conversation);
   },
 );
 
@@ -241,85 +202,6 @@ router.put(
   upload.single("groupImage"),
   middleware.findUserSession,
   async (req, res) => {
-    try {
-      const conversation = await Conversation.findByPk(req.params.id, {
-        include: [
-          {
-            model: Message,
-            attributes: {
-              exclude: ["createdAt", "updatedAt"],
-            },
-          },
-          {
-            model: User,
-            as: "participant_list",
-            attributes: {
-              exclude: ["passwordHash", "createdAt", "updatedAt"],
-            },
-            through: {
-              attributes: {
-                exclude: ["createdAt", "updatedAt", "userId"],
-              },
-              as: "participant_details",
-            },
-          },
-        ],
-      });
-
-      if (!conversation) {
-        return res.status(404).json({ error: "Conversation not found" });
-      }
-
-      // take the current user based on the token and find that user in the conversation
-      const user = req.user;
-      const userInConversation = conversation.participant_list.find(
-        (participant) => participant.id === user.id,
-      );
-
-      // if there is no user or the user is not in the conversation, then he/she is not authorized to change conversation
-      if (
-        !user ||
-        !userInConversation ||
-        !userInConversation.participant_details.isAdmin
-      ) {
-        return res.status(404).json({ error: "Unauthorized" });
-      }
-
-      const updatedFields = {};
-
-      if (req.body.title) {
-        updatedFields.title = req.body.title;
-      }
-      if (req.file) {
-        const imageName = randomImageName();
-        const deleteParams = {
-          Bucket: bucketName,
-          Key: conversation.imageName,
-        };
-        const deleteCommand = new DeleteObjectCommand(deleteParams);
-        await s3.send(deleteCommand);
-
-        const updateParams = {
-          Bucket: bucketName,
-          Key: imageName,
-          Body: req.file.buffer,
-          ContentType: req.file.mimetype,
-        };
-        const updateCommand = new PutObjectCommand(updateParams);
-        await s3.send(updateCommand);
-        updatedFields.imageName = imageName;
-      }
-      updatedFields.updatedAt = new Date();
-      await conversation.update(updatedFields);
-      res.status(201).json(conversation);
-    } catch (err) {
-      res.status(500).json({ error: "Internal server error" });
-    }
-  },
-);
-
-router.delete("/:id", middleware.findUserSession, async (req, res) => {
-  try {
     const conversation = await Conversation.findByPk(req.params.id, {
       include: [
         {
@@ -348,29 +230,127 @@ router.delete("/:id", middleware.findUserSession, async (req, res) => {
       return res.status(404).json({ error: "Conversation not found" });
     }
 
-    // take the current user based on the token and find that user in the conversation
-    const user = req.user;
+    const { user } = req;
     const userInConversation = conversation.participant_list.find(
       (participant) => participant.id === user.id,
     );
 
-    // only admin user from a conversation is allowed to delete the conversation
     if (
       !user ||
       !userInConversation ||
       !userInConversation.participant_details.isAdmin
     ) {
-      return res.status(404).json({ error: "Unauthorized" });
+      return res.status(401).json({ error: "Unauthorized" });
     }
-    const participants = await Participant.findAll({
-      where: { conversationId: conversation.id },
+
+    const updatedFields = {};
+    if (req.body.title) {
+      updatedFields.title = req.body.title;
+    }
+
+    if (req.file) {
+      const imageName = conversation.imageName || randomFileName();
+      await uploadFile(imageName, req.file.buffer, req.file.mimetype);
+      updatedFields.imageName = imageName;
+    }
+
+    updatedFields.updatedAt = new Date();
+    await conversation.update(updatedFields);
+
+    const updatedConversation = await Conversation.findByPk(conversation.id, {
+      include: [
+        {
+          model: User,
+          as: "participant_list",
+          attributes: {
+            exclude: ["passwordHash", "createdAt", "updatedAt"],
+          },
+          through: {
+            attributes: {
+              exclude: ["createdAt", "updatedAt", "userId"],
+            },
+            as: "participant_details",
+          },
+        },
+      ],
     });
-    await Promise.all(participants.map((participant) => participant.destroy()));
-    await conversation.destroy();
-    res.status(204).json(conversation);
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+
+    if (updatedConversation.imageName) {
+      updatedConversation.imageName = await generateSignedUrl(
+        updatedConversation.imageName,
+      );
+    }
+
+    const participants = conversation.participant_list
+      .map((participant) => participant.id)
+      .filter((id) => id !== user.id);
+
+    await Promise.all(
+      participants.map(async (participant) => {
+        const receiverSocketId = getReceiverSocketId(participant);
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit(
+            "updateConversation",
+            updatedConversation,
+          );
+        }
+      }),
+    );
+    return res.status(201).json(conversation);
+  },
+);
+
+router.delete("/:id", middleware.findUserSession, async (req, res) => {
+  const conversation = await Conversation.findByPk(req.params.id, {
+    include: [
+      {
+        model: Message,
+        attributes: {
+          exclude: ["createdAt", "updatedAt"],
+        },
+      },
+      {
+        model: User,
+        as: "participant_list",
+        attributes: {
+          exclude: ["passwordHash", "createdAt", "updatedAt"],
+        },
+        through: {
+          attributes: {
+            exclude: ["createdAt", "updatedAt", "userId"],
+          },
+          as: "participant_details",
+        },
+      },
+    ],
+  });
+
+  if (!conversation) {
+    return res.status(404).json({ error: "Conversation not found" });
   }
+
+  // take the current user based on the token and find that user in the conversation
+  const { user } = req;
+  const userInConversation = conversation.participant_list.find(
+    (participant) => participant.id === user.id,
+  );
+
+  // only admin user from a conversation is allowed to delete the conversation
+  if (
+    [
+      !user,
+      !userInConversation,
+      !userInConversation.participant_details.isAdmin,
+    ].includes(true)
+  ) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const participants = await Participant.findAll({
+    where: { conversationId: conversation.id },
+  });
+  await Promise.all(participants.map((participant) => participant.destroy()));
+  await conversation.destroy();
+  return res.status(204).json(conversation);
 });
 
 module.exports = router;

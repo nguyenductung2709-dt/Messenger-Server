@@ -1,0 +1,1330 @@
+openapi: 3.0.0
+info:
+  title: User Authentication API
+  version: 1.0.0
+  description: API for user login and logout functionality
+
+servers:
+  - url: http://localhost:3000/api # Replace with your actual base API URL
+
+tags:
+  - name: Authentication
+    description: User login and logout operations
+  - name: Users
+    description: Operations related to user management
+  - name: Conversations
+    description: Operations related to conversation management
+  - name: Participants
+    description: Operations related to participant management
+  - name: Friends
+    description: Operations related to friend management
+  - name: Messages
+    description: Operations related to message management
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Allows users to log in with their gmail and password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gmail:
+                  type: string
+                  description: User's gmail address
+                password:
+                  type: string
+                  description: User's password
+                  format: password
+      responses:
+        200:
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: User's ID
+                  token:
+                    type: string
+                    description: JWT authentication token
+                  gmail:
+                    type: string
+                    description: User's gmail address
+        401:
+          description: Invalid username or password, or user disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid username or password
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Allows a logged-in user to log out and invalidate their session.
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Successful logout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Successfully logged out!
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: User not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Get all users
+      description: Retrieves a list of all users in the system.
+      responses:
+        200:
+          description: Successful retrieval of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+    post:
+      tags:
+        - Users
+      summary: Create a new user
+      description: Creates a new user with the provided information.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                gmail: # Changed from 'gmail'
+                  type: string
+                  description: User's gmail address
+                password:
+                  type: string
+                  description: User's password
+                  format: password
+                firstName:
+                  type: string
+                  description: User's first name
+                lastName:
+                  type: string
+                  description: User's last name
+                middleName:
+                  type: string
+                  description: User's middle name (optional)
+                dateOfBirth:
+                  type: string
+                  description: User's date of birth (MM/DD/YYYY, optional)
+                avatarImage:
+                  type: string
+                  format: binary
+                  description: User's profile image (optional)
+      responses:
+        201:
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get a specific user
+      description: Retrieves a single user based on their ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        200:
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCreated"
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: User not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+    put:
+      tags:
+        - Users
+      summary: Update an user
+      description: Updates an existing user with the provided information.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                gmail:
+                  type: string
+                  description: User's gmail address (optional)
+                firstName:
+                  type: string
+                  description: User's first name (optional)
+                lastName:
+                  type: string
+                  description: User's last name (optional)
+                middleName:
+                  type: string
+                  description: User's middle name (optional)
+                dateOfBirth:
+                  type: string
+                  description: User's date of birth (MM/DD/YYYY, optional)
+                avatarImage:
+                  type: string
+                  format: binary
+                  description: User's profile image (optional)
+      responses:
+        200:
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCreated"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: User not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /conversations:
+    get:
+      tags:
+        - Conversations
+      summary: Get all conversations
+      description: Retrieves a list of all conversations in the system.
+      responses:
+        200:
+          description: Successful retrieval of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+    post:
+      tags:
+        - Conversations
+      summary: Create a new conversation
+      description: Creates a new conversation with the provided information.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Group's title
+                participants:
+                  type: array
+                  description: Array of participants' IDs
+                groupImage:
+                  type: string
+                  format: binary
+                  description: Group's Image (optional)
+      responses:
+        201:
+          description: Conversation created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationGeneral"
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /conversations/{id}:
+    get:
+      tags:
+        - Conversations
+      summary: Get a specific conversation
+      description: Retrieves a single conversation based on its ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Conversation ID
+      responses:
+        200:
+          description: Conversation retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        404:
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Conversation not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+    put:
+      tags:
+        - Conversations
+      summary: Update a conversation
+      description: Updates an existing conversation with the provided information.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Conversation ID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Group's title (optional)
+                groupImage:
+                  type: string
+                  format: binary
+                  description: Group's Image (optional)
+      responses:
+        200:
+          description: Conversation updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        404:
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Conversation not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+    delete:
+      tags:
+        - Conversations
+      summary: Delete a conversation
+      description: Delete an existing conversation.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Conversation ID
+      responses:
+        200:
+          description: Conversation deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        404:
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Conversation not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /participants:
+    post:
+      tags:
+        - Participants
+      summary: Create a new participant
+      description: Creates a new participant in a conversation with the provided information.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                conversationId:
+                  type: integer
+                  description: Conversation's ID
+                gmail:
+                  type: string
+                  description: Participant's gmail address
+      responses:
+        201:
+          description: Participant added successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Participant"
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /participants/{id}:
+    get:
+      tags:
+        - Participants
+      summary: Get participants in a specific conversation
+      description: Retrieves an array of participants in conversation with conversationID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Conversation ID
+      responses:
+        200:
+          description: Participants retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                $ref: "#/components/schemas/ParticipantInConversation"
+        404:
+          description: Participants not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Participants not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+    put:
+      tags:
+        - Participants
+      summary: Update a participant
+      description: Update a normal participant into admin of the conversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Participant ID
+      responses:
+        200:
+          description: Participant updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Participant"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        404:
+          description: Participant not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Participant not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+    delete:
+      tags:
+        - Participants
+      summary: Delete a participant
+      description: Delete a participant from a conversation.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Participant ID
+      responses:
+        200:
+          description: Participant deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Participant"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        404:
+          description: Participant not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Participant not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /friends:
+    post:
+      tags:
+        - Friends
+      summary: Create a new friend
+      description: Creates a new friend and then create a new conversation between them.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gmail:
+                  type: string
+                  description: Friend's gmail address
+      responses:
+        201:
+          description: Friend added successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Friend"
+        400:
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Bad request
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /friends/{id}:
+    get:
+      tags:
+        - Friends
+      summary: Get friends of a specific user
+      description: Retrieves an array of friends of an user with userId.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        200:
+          description: Friends retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                $ref: "#/components/schemas/FriendInUser"
+        404:
+          description: Friends not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Friends not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+    delete:
+      tags:
+        - Friends
+      summary: Delete a friend
+      description: Delete a friend.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Friend ID
+      responses:
+        200:
+          description: Friend deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Friend"
+        404:
+          description: Friend not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Friend not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /messages:
+    post:
+      tags:
+        - Messages
+      summary: Create a new message
+      description: Creates a new message in a conversation.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                conversationId:
+                  type: integer
+                  description: Conversation's ID
+                senderId:
+                  type: integer
+                  description: Sender's ID
+                message:
+                  type: string
+                  description: Text message
+                messageImage:
+                  type: string
+                  format: binary
+                  description: Message's Image
+      responses:
+        201:
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /messages/{id}:
+    get:
+      tags:
+        - Messages
+      summary: Get messages of a specific conversation
+      description: Retrieves an array of messages of an conversation with conversationId.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Conversation ID
+      responses:
+        200:
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                $ref: "#/components/schemas/Message"
+        404:
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Conversation not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+    put:
+      tags:
+        - Messages
+      summary: Create a new message
+      description: Creates a new message in a conversation.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Message ID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                conversationId:
+                  type: integer
+                  description: Conversation's ID
+                senderId:
+                  type: integer
+                  description: Sender's ID
+                message:
+                  type: string
+                  description: Text message
+                messageImage:
+                  type: string
+                  format: binary
+                  description: Message's Image
+      responses:
+        201:
+          description: Message updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        404:
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Message not found
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+
+    delete:
+      tags:
+        - Messages
+      summary: Delete a message
+      description: Delete a message.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Message ID
+      responses:
+        200:
+          description: Friend deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Friend"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        404:
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserCreated:
+      type: object
+      properties:
+        id:
+          type: integer
+        gmail:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        middleName:
+          type: string
+        dateOfBirth:
+          type: string
+        avatarName:
+          type: string
+        disabled:
+          type: boolean
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        gmail:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        middleName:
+          type: string
+        dateOfBirth:
+          type: string
+        avatarName:
+          type: string
+        disabled:
+          type: boolean
+        conversation:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationGeneral"
+        friends:
+          type: array
+          items:
+            $ref: "#/components/schemas/Friend"
+
+    ConversationGeneral:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        creatorId:
+          type: integer
+        imageName:
+          type: string
+        createdAt:
+          format: date-time
+        updatedAt:
+          format: date-time
+        deletedAt:
+          format: date-time
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        creatorId:
+          type: integer
+        imageName:
+          type: string
+        createdAt:
+          format: date-time
+        updatedAt:
+          format: date-time
+        deletedAt:
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        participant_list:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantInConversation"
+
+    Participant:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        userId:
+          type: integer
+        isAdmin:
+          type: boolean
+        createdAt:
+          format: date-time
+        updatedAt:
+          format: date-time
+
+    ParticipantInConversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        gmail:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        middleName:
+          type: string
+        dateOfBirth:
+          format: date-time
+        avatarName:
+          type: string
+        disabled:
+          type: boolean
+        participant_details:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              conversationId:
+                type: integer
+              isAdmin:
+                type: boolean
+
+    Friend:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        friendId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FriendDeleted:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        friendId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          
+    FriendInUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        friendId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            gmail:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+            middleName:
+              type: string
+            dateOfBirth:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+            avatarName:
+              type: string
+            disabled:
+              type: boolean
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        senderId:
+          type: integer
+        message:
+          type: string
+        fileName:
+          type: string
+        fileUrl:
+          type: string
+        imageUrl:
+          type: string
+        createdAt:
+          format: date-time
+        updatedAt:
+          format: date-time

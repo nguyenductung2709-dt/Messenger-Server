@@ -49,7 +49,7 @@ module.exports = {
       },
       avatar_name: {
         type: DataTypes.TEXT,
-        //allowNull: false,
+        // allowNull: false,
       },
       disabled: {
         type: DataTypes.BOOLEAN,

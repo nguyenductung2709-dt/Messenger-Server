@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+const supertest = require("supertest");
 const {
   User,
   Session,
@@ -6,10 +8,11 @@ const {
   Participant,
   Message,
 } = require("../models/index");
-const supertest = require("supertest");
 const app = require("../app");
+
 const api = supertest(app);
 const { connectToDatabase } = require("../utils/db");
+const { createFirstUser, login } = require("./testhelper");
 
 beforeEach(async () => {
   try {
@@ -25,33 +28,9 @@ beforeEach(async () => {
   }
 });
 
-const createUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "ronaldo@gmail.com")
-    .field("password", "ronaldosiu")
-    .field("firstName", "Ronaldo")
-    .field("lastName", "Aveiro")
-    .field("middleName", "Cristiano")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const login = async () => {
-  const accountDetails = {
-    gmail: "ronaldo@gmail.com",
-    password: "ronaldosiu",
-  };
-  await api
-    .post("/api/auth/login")
-    .send(accountDetails)
-    .expect(200)
-    .expect("Content-Type", /application\/json/);
-};
-
 describe("Test logout functionality", () => {
   test("login and logout functionality", async () => {
-    await createUser();
+    await createFirstUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const session = await Session.findOne({ where: { userId: user.id } });

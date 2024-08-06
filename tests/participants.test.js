@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+const supertest = require("supertest");
 const {
   User,
   Session,
@@ -6,10 +8,18 @@ const {
   Participant,
   Message,
 } = require("../models/index");
-const supertest = require("supertest");
 const app = require("../app");
+
 const api = supertest(app);
 const { connectToDatabase } = require("../utils/db");
+const {
+  createFirstUser,
+  createSecondUser,
+  createThirdUser,
+  createFourthUser,
+  login,
+  loginAnother,
+} = require("./testhelper");
 
 beforeEach(async () => {
   try {
@@ -25,80 +35,8 @@ beforeEach(async () => {
   }
 });
 
-const createFirstUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "ronaldo@gmail.com")
-    .field("password", "ronaldosiu")
-    .field("firstName", "Ronaldo")
-    .field("lastName", "Aveiro")
-    .field("middleName", "Cristiano")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const createSecondUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "messi@gmail.com")
-    .field("password", "messidibovuotrau")
-    .field("firstName", "Messi")
-    .field("lastName", "Lionel")
-    .field("middleName", "Goat")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const createThirdUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "neymar@gmail.com")
-    .field("password", "neymar")
-    .field("firstName", "Neymar")
-    .field("lastName", "Dos Santos")
-    .field("middleName", "Junior")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const createFourthUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "benzema@gmail.com")
-    .field("password", "benzema")
-    .field("firstName", "Benzema")
-    .field("lastName", "Dos Santos")
-    .field("middleName", "Junior")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const login = async () => {
-  const accountDetails = {
-    gmail: "ronaldo@gmail.com",
-    password: "ronaldosiu",
-  };
-  await api
-    .post("/api/auth/login")
-    .send(accountDetails)
-    .expect(200)
-    .expect("Content-Type", /application\/json/);
-};
-
-const loginAnother = async () => {
-  const accountDetails = {
-    gmail: "benzema@gmail.com",
-    password: "benzema",
-  };
-  await api
-    .post("/api/auth/login")
-    .send(accountDetails)
-    .expect(200)
-    .expect("Content-Type", /application\/json/);
-};
-
-describe("Testing POST and GET request", () => {
-  test("addition of a new participant and get participant correctly", async () => {
+describe("Testing POST request", () => {
+  test("addition of a new participant correctly", async () => {
     await createFirstUser();
     await createSecondUser();
     await createThirdUser();
@@ -136,12 +74,8 @@ describe("Testing POST and GET request", () => {
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
-    const participants = await api
-      .get("/api/participants")
-      .expect(200)
-      .expect("Content-Type", /application\/json/);
-
-    expect(participants.body).toHaveLength(4);
+    const participants = await Participant.findAll({});
+    expect(participants).toHaveLength(4);
   });
 });
 
@@ -251,7 +185,7 @@ describe("Testing PUT request", () => {
     await api
       .put(`/api/participants/${participant.id}`)
       .set("Authorization", `bearer ${sessionAnother.token}`)
-      .expect(404);
+      .expect(401);
   });
 });
 
@@ -358,6 +292,6 @@ describe("Testing DELETE request", () => {
     await api
       .delete(`/api/participants/${participant.id}`)
       .set("Authorization", `bearer ${sessionAnother.token}`)
-      .expect(404);
+      .expect(401);
   });
 });

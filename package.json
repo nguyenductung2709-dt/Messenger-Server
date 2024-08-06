@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "NODE_ENV=development nodemon index.js",
-    "prettier": "npx prettier . --check",
-    "prettier:fix": "npx prettier . --write",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
     "migration:down": "node utils/rollback.js",
     "test": "NODE_ENV=test jest --verbose --runInBand"
   },
@@ -35,10 +35,22 @@
     "pg": "^8.11.5",
     "sequelize": "^6.37.2",
     "socket.io": "^4.7.5",
-    "umzug": "^3.8.0"
+    "swagger-ui-express": "^5.0.0",
+    "umzug": "^3.8.0",
+    "yaml": "^2.4.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.1.1",
     "@flydotio/dockerfile": "^0.5.4",
+    "@stylistic/eslint-plugin-js": "^1.8.0",
+    "eslint": "^8.57.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-react": "^7.34.1",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "globals": "^15.1.0",
     "jest": "^29.7.0",
     "prettier": "3.2.5",
     "supertest": "^6.3.4"

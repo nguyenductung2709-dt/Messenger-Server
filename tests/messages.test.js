@@ -1,3 +1,7 @@
+/* eslint-disable no-undef */
+const supertest = require("supertest");
+const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const path = require("path");
 const {
   User,
   Session,
@@ -6,14 +10,20 @@ const {
   Participant,
   Message,
 } = require("../models/index");
-const supertest = require("supertest");
 const app = require("../app");
+
 const api = supertest(app);
-const path = require("path");
 const s3 = require("../utils/s3user");
-const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
+
 const bucketName = process.env.BUCKET_NAME;
 const { connectToDatabase } = require("../utils/db");
+const {
+  createFirstUser,
+  createSecondUser,
+  createThirdUser,
+  login,
+  loginSecond,
+} = require("./testhelper");
 
 beforeEach(async () => {
   try {
@@ -28,67 +38,6 @@ beforeEach(async () => {
     console.error("Error deleting users:", error);
   }
 });
-
-const createUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "ronaldo@gmail.com")
-    .field("password", "ronaldosiu")
-    .field("firstName", "Ronaldo")
-    .field("lastName", "Aveiro")
-    .field("middleName", "Cristiano")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const createAnotherUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "messi@gmail.com")
-    .field("password", "messidibovuotrau")
-    .field("firstName", "Messi")
-    .field("lastName", "Lionel")
-    .field("middleName", "Goat")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const createMoreUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "neymar@gmail.com")
-    .field("password", "neymar")
-    .field("firstName", "Neymar")
-    .field("lastName", "Dos Santos")
-    .field("middleName", "Junior")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const login = async () => {
-  const accountDetails = {
-    gmail: "ronaldo@gmail.com",
-    password: "ronaldosiu",
-  };
-  await api
-    .post("/api/auth/login")
-    .send(accountDetails)
-    .expect(200)
-    .expect("Content-Type", /application\/json/);
-};
-
-const loginAnother = async () => {
-  const accountDetails = {
-    gmail: "messi@gmail.com",
-    password: "messidibovuotrau",
-  };
-  await api
-    .post("/api/auth/login")
-    .send(accountDetails)
-    .expect(200)
-    .expect("Content-Type", /application\/json/);
-};
-
 const deleteImageTest2 = async (message) => {
   let deleteParams = {};
   if (message.imageUrl) {
@@ -111,9 +60,9 @@ const deleteImageTest2 = async (message) => {
 describe("Testing POST and GET requests", () => {
   test("a message with image is sent properly", async () => {
     const imagePath = path.resolve(__dirname, "../assets/messi.webp");
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -154,9 +103,9 @@ describe("Testing POST and GET requests", () => {
 
   test("a message with file is sent properly", async () => {
     const filePath = path.resolve(__dirname, "../assets/test.txt");
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -197,9 +146,9 @@ describe("Testing POST and GET requests", () => {
 
   test("unauthorized user cannot send a message", async () => {
     const filePath = path.resolve(__dirname, "../assets/test.txt");
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -226,16 +175,16 @@ describe("Testing POST and GET requests", () => {
       .field("senderId", user.id)
       .field("message", "Siuuuu")
       .attach("messageImage", filePath)
-      .expect(500);
+      .expect(401);
   });
 });
 
 describe("Testing PUT request", () => {
   test("user can fix his/her message", async () => {
     const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -286,9 +235,9 @@ describe("Testing PUT request", () => {
 
   test("user cannot fix message of other user", async () => {
     const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -323,7 +272,7 @@ describe("Testing PUT request", () => {
       where: { conversationId: conversation.id, senderId: user.id },
     });
 
-    await loginAnother();
+    await loginSecond();
     const sessionAnother = await Session.findOne({
       where: { userId: userAnother.id },
     });
@@ -332,7 +281,7 @@ describe("Testing PUT request", () => {
       .put(`/api/messages/${message.id}`)
       .set("Authorization", `bearer ${sessionAnother.token}`)
       .field("message", "Messi is better")
-      .expect(404);
+      .expect(401);
 
     deleteImageTest2(message);
   });
@@ -341,9 +290,9 @@ describe("Testing PUT request", () => {
 describe("Testing DELETE request", () => {
   test("user can delete his/her messages", async () => {
     const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -390,9 +339,9 @@ describe("Testing DELETE request", () => {
 
   test("user cannot delete message of other user", async () => {
     const imagePath = path.resolve(__dirname, "../assets/ronaldo.webp");
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -427,7 +376,7 @@ describe("Testing DELETE request", () => {
       where: { conversationId: conversation.id, senderId: user.id },
     });
 
-    await loginAnother();
+    await loginSecond();
     const sessionAnother = await Session.findOne({
       where: { userId: userAnother.id },
     });
@@ -435,7 +384,7 @@ describe("Testing DELETE request", () => {
     await api
       .delete(`/api/messages/${message.id}`)
       .set("Authorization", `bearer ${sessionAnother.token}`)
-      .expect(404);
+      .expect(401);
 
     const messages = await Message.findAll({});
     expect(messages).toHaveLength(1);

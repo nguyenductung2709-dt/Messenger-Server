@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+const supertest = require("supertest");
 const {
   User,
   Session,
@@ -6,10 +8,17 @@ const {
   Participant,
   Message,
 } = require("../models/index");
-const supertest = require("supertest");
 const app = require("../app");
+
 const api = supertest(app);
 const { connectToDatabase } = require("../utils/db");
+const {
+  createFirstUser,
+  createSecondUser,
+  createThirdUser,
+  login,
+  loginSecond,
+} = require("./testhelper");
 
 beforeEach(async () => {
   try {
@@ -25,71 +34,11 @@ beforeEach(async () => {
   }
 });
 
-const createUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "ronaldo@gmail.com")
-    .field("password", "ronaldosiu")
-    .field("firstName", "Ronaldo")
-    .field("lastName", "Aveiro")
-    .field("middleName", "Cristiano")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const createAnotherUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "messi@gmail.com")
-    .field("password", "messidibovuotrau")
-    .field("firstName", "Messi")
-    .field("lastName", "Lionel")
-    .field("middleName", "Goat")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const createMoreUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "neymar@gmail.com")
-    .field("password", "neymar")
-    .field("firstName", "Neymar")
-    .field("lastName", "Dos Santos")
-    .field("middleName", "Junior")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const login = async () => {
-  const accountDetails = {
-    gmail: "ronaldo@gmail.com",
-    password: "ronaldosiu",
-  };
-  await api
-    .post("/api/auth/login")
-    .send(accountDetails)
-    .expect(200)
-    .expect("Content-Type", /application\/json/);
-};
-
-const loginAnother = async () => {
-  const accountDetails = {
-    gmail: "messi@gmail.com",
-    password: "messidibovuotrau",
-  };
-  await api
-    .post("/api/auth/login")
-    .send(accountDetails)
-    .expect(200)
-    .expect("Content-Type", /application\/json/);
-};
-
 describe("Addition of a new conversation, correctly get a conversation", () => {
   test("adding a new conversation", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -112,13 +61,13 @@ describe("Addition of a new conversation, correctly get a conversation", () => {
   });
 
   test("unauthorized cannot create conversation", async () => {
-    await api.post("/api/conversations").field("title", "xoaixinh").expect(500);
+    await api.post("/api/conversations").field("title", "xoaixinh").expect(401);
   });
 
   test("conversation is get correctly", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -146,9 +95,9 @@ describe("Addition of a new conversation, correctly get a conversation", () => {
 
 describe("Viewing a specific conversation", () => {
   test("A specific conversation is get correctly", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -177,9 +126,9 @@ describe("Viewing a specific conversation", () => {
   });
 
   test("fails with status code 404 if conversation does not exist", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -204,9 +153,9 @@ describe("Viewing a specific conversation", () => {
 
 describe("Changing information about a conversation", () => {
   test("user in a conversation can change information", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -242,9 +191,9 @@ describe("Changing information about a conversation", () => {
   });
 
   test("user not in conversation cannot change information of the conversation", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -266,7 +215,7 @@ describe("Changing information about a conversation", () => {
       where: { creatorId: user.id },
     });
 
-    await loginAnother();
+    await loginSecond();
 
     const sessionAnother = await Session.findOne({
       where: { userId: userAnother.id },
@@ -276,13 +225,13 @@ describe("Changing information about a conversation", () => {
       .put(`/api/conversations/${conversation.id}`)
       .set("Authorization", `bearer ${sessionAnother.token}`)
       .field("title", "TungDz")
-      .expect(404);
+      .expect(401);
   });
 
   test("fails with status code 404 if the conversation does not exist", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -312,9 +261,9 @@ describe("Changing information about a conversation", () => {
 
 describe("Admin can delete a conversation", () => {
   test("delete a conversation", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -346,9 +295,9 @@ describe("Admin can delete a conversation", () => {
   });
 
   test("fails with status code 404 if the conversation does not exist", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -376,9 +325,9 @@ describe("Admin can delete a conversation", () => {
   });
 
   test("non-admin user cannot delete a conversation", async () => {
-    await createUser();
-    await createAnotherUser();
-    await createMoreUser();
+    await createFirstUser();
+    await createSecondUser();
+    await createThirdUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
@@ -399,7 +348,7 @@ describe("Admin can delete a conversation", () => {
     const conversation = await Conversation.findOne({
       where: { creatorId: user.id },
     });
-    await loginAnother();
+    await loginSecond();
     const sessionAnother = await Session.findOne({
       where: { userId: userAnother.id },
     });
@@ -411,7 +360,7 @@ describe("Admin can delete a conversation", () => {
     await api
       .delete(`/api/conversations/${conversation.id}`)
       .set("Authorization", `bearer ${sessionAnother.token}`)
-      .expect(404);
+      .expect(401);
 
     const conversations = await Conversation.findAll({});
     expect(conversations).toHaveLength(1);

@@ -3,7 +3,7 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
-const bucketName = process.env.BUCKET_NAME;
+// eslint-disable-next-line no-undef
 const bucketRegion = process.env.BUCKET_REGION;
 
 const s3 = new S3Client({

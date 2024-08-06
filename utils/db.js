@@ -1,6 +1,7 @@
+/* eslint-disable no-use-before-define */
 const Sequelize = require("sequelize");
-const { DATABASE_URL } = require("./config");
 const { Umzug, SequelizeStorage } = require("umzug");
+const { DATABASE_URL } = require("./config");
 
 const sequelize = new Sequelize(DATABASE_URL, {
   dialect: "postgresql",
@@ -18,7 +19,8 @@ const connectToDatabase = async () => {
     await runMigrations();
     console.log("connected to the database");
   } catch (err) {
-    console.log("failed to connect to the database");
+    console.log("failed to connect to the database", err);
+    // eslint-disable-next-line no-undef
     return process.exit(1);
   }
 

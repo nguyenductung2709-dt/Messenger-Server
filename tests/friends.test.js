@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+const supertest = require("supertest");
 const {
   User,
   Session,
@@ -6,10 +8,16 @@ const {
   Participant,
   Message,
 } = require("../models/index");
-const supertest = require("supertest");
 const app = require("../app");
+
 const api = supertest(app);
 const { connectToDatabase } = require("../utils/db");
+const {
+  createFirstUser,
+  createSecondUser,
+  login,
+  loginSecond,
+} = require("./testhelper");
 
 beforeEach(async () => {
   try {
@@ -25,58 +33,10 @@ beforeEach(async () => {
   }
 });
 
-const createUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "ronaldo@gmail.com")
-    .field("password", "ronaldosiu")
-    .field("firstName", "Ronaldo")
-    .field("lastName", "Aveiro")
-    .field("middleName", "Cristiano")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const createAnotherUser = async () => {
-  await api
-    .post("/api/users")
-    .field("gmail", "messi@gmail.com")
-    .field("password", "messidibovuotrau")
-    .field("firstName", "Messi")
-    .field("lastName", "Lionel")
-    .field("middleName", "Goat")
-    .expect(201)
-    .expect("Content-Type", /application\/json/);
-};
-
-const login = async () => {
-  const accountDetails = {
-    gmail: "ronaldo@gmail.com",
-    password: "ronaldosiu",
-  };
-  await api
-    .post("/api/auth/login")
-    .send(accountDetails)
-    .expect(200)
-    .expect("Content-Type", /application\/json/);
-};
-
-const loginAnother = async () => {
-  const accountDetails = {
-    gmail: "messi@gmail.com",
-    password: "messidibovuotrau",
-  };
-  await api
-    .post("/api/auth/login")
-    .send(accountDetails)
-    .expect(200)
-    .expect("Content-Type", /application\/json/);
-};
-
 describe("Adding a new relationship, get a relationship", () => {
   test("adding a relationship", async () => {
-    await createUser();
-    await createAnotherUser();
+    await createFirstUser();
+    await createSecondUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const session = await Session.findOne({ where: { userId: user.id } });
@@ -89,39 +49,13 @@ describe("Adding a new relationship, get a relationship", () => {
       })
       .expect(201)
       .expect("Content-Type", /application\/json/);
-  });
-
-  test("friends are get correctly", async () => {
-    await createUser();
-    await createAnotherUser();
-    await login();
-    const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
-    const userAnother = await User.findOne({
-      where: { gmail: "messi@gmail.com" },
-    });
-    const session = await Session.findOne({ where: { userId: user.id } });
-    await api
-      .post("/api/friends")
-      .set("Authorization", `bearer ${session.token}`)
-      .send({
-        gmail: "messi@gmail.com",
-        userId: user.id,
-      })
-      .expect(201)
-      .expect("Content-Type", /application\/json/);
-    const friends = await api
-      .get("/api/friends")
-      .expect(200)
-      .expect("Content-Type", /application\/json/);
-    const userIds = friends.body.map((user) => user.userId);
-    expect(userIds).toContain(user.id);
   });
 });
 
 describe("Viewing a specific relationship", () => {
   test("succeeds with a valid id", async () => {
-    await createUser();
-    await createAnotherUser();
+    await createFirstUser();
+    await createSecondUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const session = await Session.findOne({ where: { userId: user.id } });
@@ -135,7 +69,6 @@ describe("Viewing a specific relationship", () => {
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
-    const friend = await Friend.findOne({ where: { userId: user.id } });
     const friendFound = await api
       .get(`/api/friends/${user.id}`)
       .expect(200)
@@ -147,13 +80,10 @@ describe("Viewing a specific relationship", () => {
 
 describe("Deleting a relationship", () => {
   test("Authorized user can delete his/her friend", async () => {
-    await createUser();
-    await createAnotherUser();
+    await createFirstUser();
+    await createSecondUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
-    const userAnother = await User.findOne({
-      where: { gmail: "messi@gmail.com" },
-    });
     const session = await Session.findOne({ where: { userId: user.id } });
     await api
       .post("/api/friends")
@@ -176,9 +106,9 @@ describe("Deleting a relationship", () => {
     expect(friendsFound).not.toContain(friend);
   });
 
-  test("Unauthorized user cannot delete friend return status 500", async () => {
-    await createUser();
-    await createAnotherUser();
+  test("Unauthorized user cannot delete friend return status 401", async () => {
+    await createFirstUser();
+    await createSecondUser();
     await login();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const session = await Session.findOne({ where: { userId: user.id } });
@@ -194,14 +124,14 @@ describe("Deleting a relationship", () => {
 
     const friend = await Friend.findOne({ where: { userId: user.id } });
 
-    await api.delete(`/api/friends/${friend.id}`).expect(500);
+    await api.delete(`/api/friends/${friend.id}`).expect(401);
   });
 
   test("Authorized user cannot delete friend of other user", async () => {
-    await createUser();
-    await createAnotherUser();
+    await createFirstUser();
+    await createSecondUser();
     await login();
-    await loginAnother();
+    await loginSecond();
     const user = await User.findOne({ where: { gmail: "ronaldo@gmail.com" } });
     const userAnother = await User.findOne({
       where: { gmail: "messi@gmail.com" },
@@ -226,6 +156,6 @@ describe("Deleting a relationship", () => {
     await api
       .delete(`/api/friends/${friend.id}`)
       .set("Authorization", `bearer ${sessionAnother.token}`)
-      .expect(404);
+      .expect(401);
   });
 });

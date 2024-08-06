@@ -1,20 +1,27 @@
-const Sequelize = require("sequelize");
-const { SECRET } = require("./config.js");
+/* eslint-disable consistent-return */
+require("sequelize");
 const jwt = require("jsonwebtoken");
+const logger = require("./logger");
+const { SECRET } = require("./config");
 const { User, Session } = require("../models/index");
 
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: "unknown endpoint" });
+};
 const errorHandler = (error, request, response, next) => {
   logger.error(error.message);
-
   if (error.name === "CastError") {
     return response.status(400).send({ error: "malformatted id" });
-  } else if (error.name === "ValidationError") {
+  }
+  if (error.name === "ValidationError") {
     return response.status(400).json({ error: error.message });
-  } else if (error.name === "JsonWebTokenError") {
+  }
+  if (error.name === "JsonWebTokenError") {
     return response.status(401).json({
       error: "invalid token",
     });
-  } else if (error.name === "TokenExpiredError") {
+  }
+  if (error.name === "TokenExpiredError") {
     return response.status(401).json({
       error: "token expired",
     });
@@ -24,7 +31,7 @@ const errorHandler = (error, request, response, next) => {
 };
 
 const getTokenFrom = (req) => {
-  const authorization = req.headers.authorization;
+  const { authorization } = req.headers;
   if (authorization && authorization.toLowerCase().startsWith("bearer ")) {
     return authorization.substring(7);
   }
@@ -32,7 +39,7 @@ const getTokenFrom = (req) => {
 };
 
 const tokenExtractor = (req, res, next) => {
-  const authorization = req.headers.authorization;
+  const { authorization } = req.headers;
   if (authorization && authorization.toLowerCase().startsWith("bearer ")) {
     const token = authorization.substring(7);
     try {
@@ -40,7 +47,7 @@ const tokenExtractor = (req, res, next) => {
       req.decodedToken = decodedToken;
       next();
     } catch (err) {
-      return res.status(401).json({ error: "Token invalid" });
+      return res.status(401).json({ error: "Token invalid" }, err);
     }
   } else {
     return res.status(401).json({ error: "Token missing" });
@@ -61,7 +68,7 @@ const findUserSession = async (req, res, next) => {
     const token = getTokenFrom(req);
     const decodedToken = jwt.verify(token, SECRET);
     req.user = await User.findByPk(decodedToken.id);
-    const id = req.user.id;
+    const { id } = req.user;
     const validSession = await validateSession({ id, token });
     if (!decodedToken.id || !validSession) {
       throw Error("Session not valid!");
@@ -76,6 +83,7 @@ const findUserSession = async (req, res, next) => {
 };
 
 module.exports = {
+  unknownEndpoint,
   errorHandler,
   tokenExtractor,
   validateSession,

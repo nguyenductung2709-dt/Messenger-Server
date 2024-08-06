@@ -51,7 +51,7 @@ User.init(
     },
     avatarName: {
       type: DataTypes.TEXT,
-      //allowNull: false,
+      // allowNull: false,
     },
     disabled: {
       type: DataTypes.BOOLEAN,
