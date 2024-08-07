@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const middleware = require("../utils/middleware");
 const { Participant, Conversation, Message, User } = require("../models/index");
-const { generateSignedUrl } = require("../utils/aws-sdk");
+const { generateSignedUrl } = require("../utils/aws-sdk-s3");
 const { getReceiverSocketId, io } = require("../socket/socket");
 
 router.get("/:id", async (req, res) => {

@@ -12,7 +12,12 @@ const {
   randomFileName,
   uploadFile,
   generateSignedUrl,
-} = require("../utils/aws-sdk");
+} = require("../utils/aws-sdk-s3");
+
+const {
+  invalidateCloudFrontCache,
+} = require("../utils/aws-sdk-cloudfront");
+
 const { getReceiverSocketId, io } = require("../socket/socket");
 
 router.get("/", async (req, res) => {
@@ -249,9 +254,14 @@ router.put(
     }
 
     if (req.file) {
-      const imageName = conversation.imageName || randomFileName();
-      await uploadFile(imageName, req.file.buffer, req.file.mimetype);
-      updatedFields.imageName = imageName;
+      if (conversation.imageName) {
+        await uploadFile(conversation.imageName, req.file.buffer, req.file.mimetype);
+        await invalidateCloudFrontCache(conversation.imageName);
+      } else {
+        const imageName = randomFileName();
+        await uploadFile(imageName, req.file.buffer, req.file.mimetype);
+        updatedFields.imageName = imageName;
+      }
     }
 
     updatedFields.updatedAt = new Date();

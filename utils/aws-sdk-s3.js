@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
-const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const { getSignedUrl } = require("@aws-sdk/cloudfront-signer");
 const s3 = require("./s3user");
 // eslint-disable-next-line no-undef
 const bucketName = process.env.BUCKET_NAME;
@@ -20,12 +20,12 @@ const uploadFile = async (fileName, fileBuffer, fileContent) => {
 };
 
 const generateSignedUrl = async (Key) => {
-  const getObjectParams = {
-    Bucket: bucketName,
-    Key,
-  };
-  const command = new GetObjectCommand(getObjectParams);
-  return getSignedUrl(s3, command, { expiresIn: 3600 });
+  return getSignedUrl({
+    url: process.env.CDN_URL + Key,
+    dateLessThan: new Date(Date.now() + 1000 * 60 * 60 * 24),
+    privateKey: process.env.CLOUDFRONT_PRIVATE_KEY,
+    keyPairId: process.env.CLOUDFRONT_KEY_PAIR_ID,
+  })
 };
 
 module.exports = {

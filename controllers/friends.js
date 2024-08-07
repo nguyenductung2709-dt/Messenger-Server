@@ -3,7 +3,7 @@ const router = require("express").Router();
 const { Friend, Conversation, Participant, User } = require("../models/index");
 const middleware = require("../utils/middleware");
 
-const { generateSignedUrl } = require("../utils/aws-sdk");
+const { generateSignedUrl } = require("../utils/aws-sdk-s3");
 
 const { getReceiverSocketId, io } = require("../socket/socket");
 

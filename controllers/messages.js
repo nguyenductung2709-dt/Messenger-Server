@@ -14,7 +14,11 @@ const {
   randomFileName,
   uploadFile,
   generateSignedUrl,
-} = require("../utils/aws-sdk");
+} = require("../utils/aws-sdk-s3");
+
+const {
+  invalidateCloudFrontCache,
+} = require("../utils/aws-sdk-cloudfront");
 
 const { getReceiverSocketId, io } = require("../socket/socket");
 
@@ -152,8 +156,10 @@ router.put(
     if (req.file) {
       if (message.imageUrl) {
         await uploadFile(message.imageUrl, req.file.buffer, req.file.mimetype);
+        await invalidateCloudFrontCache(message.imageUrl);
       } else if (message.fileUrl) {
         await uploadFile(message.fileUrl, req.file.buffer, req.file.mimetype);
+        await invalidateCloudFrontCache(message.fileUrl);
       }
     }
 

@@ -16,7 +16,11 @@ const {
   randomFileName,
   uploadFile,
   generateSignedUrl,
-} = require("../utils/aws-sdk");
+} = require("../utils/aws-sdk-s3");
+
+const {
+  invalidateCloudFrontCache,
+} = require("../utils/aws-sdk-cloudfront");
 
 router.get("/", async (req, res) => {
   const users = await User.findAll({
@@ -129,10 +133,11 @@ router.put(
     }
 
     if (req.file) {
-      const imageName = randomFileName();
       if (user.avatarName) {
         await uploadFile(user.avatarName, req.file.buffer, req.file.mimetype);
+        await invalidateCloudFrontCache(user.avatarName);
       } else {
+        const imageName = randomFileName();
         await uploadFile(imageName, req.file.buffer, req.file.mimetype);
         updatedFields.avatarName = imageName;
       }
