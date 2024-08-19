@@ -118,16 +118,19 @@ router.post("/login", async (req, res) => {
     { where: { gmail } },
     { attributes: { exclude: ["passwordHash"] } },
   );
-  let passwordCorrect;
-  if (user.passwordHash) {
-    passwordCorrect =
-      user == null ? false : await bcrypt.compare(password, user.passwordHash);
+  
+  let passwordCorrect = false;
+
+  if (user && user.passwordHash) {
+    passwordCorrect = await bcrypt.compare(password, user.passwordHash);
   }
-  if (!(user && passwordCorrect)) {
+  
+  if (!user || !passwordCorrect) {
     return res.status(401).json({
-      error: "invalid username or password",
+      error: "Invalid username or password",
     });
   }
+  
   if (user.disabled) {
     return res.status(401).json({
       error: "user has been disabled",

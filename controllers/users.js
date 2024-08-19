@@ -24,6 +24,15 @@ const {
   invalidateCloudFrontCache,
 } = require("../utils/aws-sdk-cloudfront");
 
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 router.get("/", async (req, res) => {
   const users = await User.findAll({
     attributes: { exclude: ["passwordHash"] },
@@ -43,7 +52,9 @@ router.get("/", async (req, res) => {
 
   await Promise.all(users.map(async(user) => {
     if (user.avatarName) {
-      user.avatarName = await generateSignedUrl(user.avatarName);
+      if (!isValidUrl(user.avatarName)) {
+        user.avatarName = await generateSignedUrl(user.avatarName);
+      }
     }
   }))
 
@@ -72,7 +83,9 @@ router.get("/:id", async (req, res) => {
   }
 
   if (user.avatarName) {
-    user.avatarName = await generateSignedUrl(user.avatarName);
+    if (!isValidUrl(user.avatarName)) {
+      user.avatarName = await generateSignedUrl(user.avatarName);
+    }
   }
 
   return res.status(200).json(user);
