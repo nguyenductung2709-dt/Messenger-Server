@@ -23,9 +23,9 @@ router.get("/:id", async (req, res) => {
 
   await Promise.all(
     participants.map(async (participant) => {
-      const { user } = participant;
-      if (user && user.avatarName) {
-        user.avatarName = await generateSignedUrl(user.avatarName);
+      const { jwtUser } = participant;
+      if (jwtUser && jwtUser.avatarName) {
+        jwtUser.avatarName = await generateSignedUrl(jwtUser.avatarName);
       }
     }),
   );
@@ -55,21 +55,21 @@ router.post("/", middleware.findUserSession, async (req, res) => {
   if (!conversation) {
     return res.status(404).json({ error: "Conversation not found" });
   }
-  const { user } = req;
+  const { jwtUser } = req;
 
   // ids of all participants
   const participants = conversation.participant_list
     .map((participant) => participant.id)
-    .filter((id) => id !== user.id);
+    .filter((id) => id !== jwtUser.id);
 
   // take the user in the conversation with the current user's id
   const userInConversation = conversation.participant_list.find(
-    (participant) => participant.id === user.id,
+    (participant) => participant.id === jwtUser.id,
   );
 
   // only admin can add another participant so check if the current user is admin
   if (
-    !user ||
+    !jwtUser ||
     !userInConversation ||
     !userInConversation.participant_details.isAdmin
   ) {
@@ -168,12 +168,12 @@ router.put("/:id", middleware.findUserSession, async (req, res) => {
   }
 
   // check if the current user is admin of this conversation
-  const { user } = req;
+  const { jwtUser } = req;
   const userInConversation = conversation.participant_list.find(
-    (singleParticipant) => singleParticipant.id === user.id,
+    (singleParticipant) => singleParticipant.id === jwtUser.id,
   );
   if (
-    !user ||
+    !jwtUser ||
     !userInConversation ||
     !userInConversation.participant_details.isAdmin
   ) {
@@ -217,10 +217,10 @@ router.delete("/:id", middleware.findUserSession, async (req, res) => {
   }
 
   // check if the current user is admin of this conversation, only admin can remove user from conversation
-  const { user } = req;
+  const { jwtUser } = req;
 
   const userInConversation = conversation.participant_list.find(
-    (singleParticipant) => singleParticipant.id === user.id,
+    (singleParticipant) => singleParticipant.id === jwtUser.id,
   );
 
   const participantDeleted = await Participant.findOne({
@@ -229,10 +229,10 @@ router.delete("/:id", middleware.findUserSession, async (req, res) => {
 
   const participants = conversation.participant_list
     .map((singleParticipant) => singleParticipant.id)
-    .filter((id) => id !== user.id && id !== participantDeleted.userId);
+    .filter((id) => id !== jwtUser.id && id !== participantDeleted.userId);
 
   if (
-    !user ||
+    !jwtUser ||
     !userInConversation ||
     !userInConversation.participant_details.isAdmin
   ) {

@@ -4,6 +4,7 @@ const Conversation = require("./conversation");
 const Message = require("./message");
 const Participant = require("./participant");
 const Friend = require("./friend");
+const Token = require("./token");
 
 User.hasMany(Message, { foreignKey: "senderId" });
 Message.belongsTo(User, { foreignKey: "senderId" });
@@ -29,4 +30,5 @@ module.exports = {
   Message,
   Participant,
   Friend,
+  Token,
 };

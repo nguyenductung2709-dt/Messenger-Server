@@ -4,6 +4,113 @@ const bcrypt = require("bcrypt");
 const { SECRET } = require("../utils/config");
 const { User, Session } = require("../models/index");
 const middleware = require("../utils/middleware");
+const passport = require("passport");
+
+router.get("/login/success", async (req, res) => {
+  const user = req.user;
+  
+  if (user) {
+    const userDetails = user._json;
+    let existingUser = await User.findOne({
+      where: { gmail: userDetails.email },
+      attributes: { exclude: ["passwordHash"] }
+    });
+    
+    if (!existingUser) {
+      // Create a new user in DB
+      const userData = {
+        gmail: userDetails.email,
+        firstName: userDetails.given_name,
+        lastName: userDetails.family_name,
+        avatarName: userDetails.picture,
+        isVerified: true
+      };
+      const newUser = await User.create(userData);
+      
+      // Create token
+      const userForToken = {
+        gmail: newUser.gmail,
+        id: newUser.id
+      };
+      const token = jwt.sign(userForToken, SECRET, { expiresIn: '1h' });
+
+      // Delete previous login information
+      await Session.destroy({
+        where: {
+          userId: newUser.id
+        }
+      });
+
+      // Add new login information
+      await Session.create({
+        userId: newUser.id,
+        token
+      });
+
+      // Send response
+      return res.status(200).json({
+        error: false,
+        message: "Successfully Logged In",
+        user: {
+          id: newUser.id, 
+          token, 
+          gmail: newUser.gmail
+        }
+      });
+    } else {
+      // User already exists
+      // Create token
+      const userForToken = {
+        gmail: existingUser.gmail,
+        id: existingUser.id
+      };
+      const token = jwt.sign(userForToken, SECRET, { expiresIn: '1h' });
+
+      // Delete previous login information
+      await Session.destroy({
+        where: {
+          userId: existingUser.id
+        }
+      });
+
+      // Add new login information
+      await Session.create({
+        userId: existingUser.id,
+        token
+      });
+
+      // Send response
+      return res.status(200).json({
+        error: false,
+        message: "Successfully Logged In",
+        user: {
+          id: existingUser.id, 
+          token, 
+          gmail: existingUser.gmail
+        }
+      });
+    }
+  } else {
+    res.status(403).json({ error: true, message: "Not Authorized" });
+  }
+});
+
+router.get("/login/failed", (req, res) => {
+	res.status(401).json({
+		error: true,
+		message: "Log in failure",
+	});
+});
+
+router.get("/google", passport.authenticate("google", ["profile", "email"]));
+
+router.get(
+	"/google/callback",
+	passport.authenticate("google", {
+		successRedirect: "http://localhost:5173",
+		failureRedirect: "/api/auth/login/failed",
+	})
+);
 
 router.post("/login", async (req, res) => {
   const { gmail, password } = req.body;
@@ -11,8 +118,11 @@ router.post("/login", async (req, res) => {
     { where: { gmail } },
     { attributes: { exclude: ["passwordHash"] } },
   );
-  const passwordCorrect =
-    user == null ? false : await bcrypt.compare(password, user.passwordHash);
+  let passwordCorrect;
+  if (user.passwordHash) {
+    passwordCorrect =
+      user == null ? false : await bcrypt.compare(password, user.passwordHash);
+  }
   if (!(user && passwordCorrect)) {
     return res.status(401).json({
       error: "invalid username or password",
@@ -45,11 +155,14 @@ router.post("/login", async (req, res) => {
 });
 
 router.post("/logout", middleware.findUserSession, async (req, res) => {
-  if (!req.user) {
+  if (req.isAuthenticated()) {
+    req.logout();
+  }
+  if (!req.jwtUser) {
     return res.status(404).json({ error: "User not found" });
   }
   // delete information of the current login information
-  const { id } = req.user;
+  const { id } = req.jwtUser;
   await Session.destroy({ where: { userId: id } });
   return res.status(200).json({ message: "Successfully logged out!" });
 });

@@ -20,7 +20,6 @@ module.exports = {
       },
       password_hash: {
         type: DataTypes.TEXT,
-        allowNull: false,
       },
       first_name: {
         type: DataTypes.TEXT,
@@ -32,7 +31,6 @@ module.exports = {
       },
       middle_name: {
         type: DataTypes.TEXT,
-        allowNull: false,
       },
       date_of_birth: {
         type: DataTypes.DATE,
@@ -55,6 +53,10 @@ module.exports = {
         type: DataTypes.BOOLEAN,
         allowNull: false,
         defaultValue: false,
+      },
+      is_verified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
       },
     });
   },

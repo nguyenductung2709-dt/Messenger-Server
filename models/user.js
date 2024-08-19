@@ -22,7 +22,7 @@ User.init(
     },
     passwordHash: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
     },
     firstName: {
       type: DataTypes.TEXT,
@@ -34,7 +34,6 @@ User.init(
     },
     middleName: {
       type: DataTypes.TEXT,
-      allowNull: false,
     },
     dateOfBirth: {
       type: DataTypes.DATE,
@@ -57,6 +56,10 @@ User.init(
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
+    },
+    isVerified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
     },
   },
   {

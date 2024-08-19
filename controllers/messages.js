@@ -59,13 +59,13 @@ router.post(
   upload.single("messageImage"),
   middleware.findUserSession,
   async (req, res) => {
-    const { user } = req;
-    if (!user) {
+    const { jwtUser } = req;
+    if (!jwtUser) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     const messageData = {
-      senderId: user.id,
+      senderId: jwtUser.id,
       ...req.body,
     };
 
@@ -136,13 +136,13 @@ router.put(
   middleware.findUserSession,
   async (req, res) => {
     const message = await Message.findByPk(req.params.id);
-    const { user } = req;
+    const { jwtUser } = req;
     if (!message) {
       return res.status(404).json({ error: "Message not found" });
     }
 
     // handle if current user has the same id with owner of the message
-    if (!user || user.id !== message.senderId) {
+    if (!jwtUser || jwtUser.id !== message.senderId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -176,8 +176,8 @@ router.delete("/:id", middleware.findUserSession, async (req, res) => {
   }
 
   // handle if the current user is the same as the owner of this message
-  const { user } = req;
-  if (!user || user.id !== message.senderId) {
+  const { jwtUser } = req;
+  if (!jwtUser || jwtUser.id !== message.senderId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   await message.destroy();

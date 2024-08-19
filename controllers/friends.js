@@ -29,8 +29,8 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", middleware.findUserSession, async (req, res) => {
-  const { user } = req;
-  if (!user || !(req.body.userId === user.id)) {
+  const { jwtUser } = req;
+  if (!jwtUser || !(req.body.userId === jwtUser.id)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
@@ -49,7 +49,7 @@ router.post("/", middleware.findUserSession, async (req, res) => {
   }
 
   // Ensure that the found user is not the same as the authenticated user
-  if (friend.id === user.id) {
+  if (friend.id === jwtUser.id) {
     return res
       .status(400)
       .json({ error: "You cannot add yourself as a friend" });
@@ -58,7 +58,7 @@ router.post("/", middleware.findUserSession, async (req, res) => {
   // Check if the relationship already exists
   const existingFriendship = await Friend.findOne({
     where: {
-      userId: user.id,
+      userId: jwtUser.id,
       friendId: friend.id,
     },
   });
@@ -69,13 +69,13 @@ router.post("/", middleware.findUserSession, async (req, res) => {
 
   // when adding a friend, person B will become a friend of person A, and vice versa
   const firstFriend = await Friend.create({
-    userId: user.id,
+    userId: jwtUser.id,
     friendId: friend.id,
   });
 
   const secondFriend = await Friend.create({
     userId: friend.id,
-    friendId: user.id,
+    friendId: jwtUser.id,
   });
 
   // After adding a friend, a conversation between them will be formed
@@ -123,7 +123,7 @@ router.post("/", middleware.findUserSession, async (req, res) => {
 
   const receiverFriendSocketId = getReceiverSocketId(friend.id);
   const newFriend = await Friend.findOne({
-    where: { userId: friend.id, friendId: user.id },
+    where: { userId: friend.id, friendId: jwtUser.id },
     include: [
       {
         model: User,
@@ -161,8 +161,8 @@ router.delete("/:id", middleware.findUserSession, async (req, res) => {
   if (!firstFriend) {
     return res.status(404).json({ error: "Friend not found" });
   }
-  const { user } = req;
-  if (!user || !(firstFriend.userId === user.id)) {
+  const { jwtUser } = req;
+  if (!jwtUser || !(firstFriend.userId === jwtUser.id)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   await firstFriend.destroy();

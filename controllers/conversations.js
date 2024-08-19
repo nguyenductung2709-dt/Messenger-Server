@@ -121,8 +121,8 @@ router.post(
   upload.single("groupImage"),
   middleware.findUserSession,
   async (req, res) => {
-    const { user } = req;
-    if (!user) {
+    const { jwtUser } = req;
+    if (!jwtUser) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -134,7 +134,7 @@ router.post(
       await uploadFile(imageName, req.file.buffer, req.file.mimetype);
 
       conversation = await Conversation.create({
-        creatorId: user.id,
+        creatorId: jwtUser.id,
         ...req.body,
         imageName,
         createdAt: new Date(),
@@ -142,7 +142,7 @@ router.post(
       });
     } else {
       conversation = await Conversation.create({
-        creatorId: user.id,
+        creatorId: jwtUser.id,
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -235,13 +235,13 @@ router.put(
       return res.status(404).json({ error: "Conversation not found" });
     }
 
-    const { user } = req;
+    const { jwtUser } = req;
     const userInConversation = conversation.participant_list.find(
-      (participant) => participant.id === user.id,
+      (participant) => participant.id === jwtUser.id,
     );
 
     if (
-      !user ||
+      !jwtUser ||
       !userInConversation ||
       !userInConversation.participant_details.isAdmin
     ) {
@@ -293,7 +293,7 @@ router.put(
 
     const participants = conversation.participant_list
       .map((participant) => participant.id)
-      .filter((id) => id !== user.id);
+      .filter((id) => id !== jwtUser.id);
 
     await Promise.all(
       participants.map(async (participant) => {
@@ -340,15 +340,15 @@ router.delete("/:id", middleware.findUserSession, async (req, res) => {
   }
 
   // take the current user based on the token and find that user in the conversation
-  const { user } = req;
+  const { jwtUser } = req;
   const userInConversation = conversation.participant_list.find(
-    (participant) => participant.id === user.id,
+    (participant) => participant.id === jwtUser.id,
   );
 
   // only admin user from a conversation is allowed to delete the conversation
   if (
     [
-      !user,
+      !jwtUser,
       !userInConversation,
       !userInConversation.participant_details.isAdmin,
     ].includes(true)

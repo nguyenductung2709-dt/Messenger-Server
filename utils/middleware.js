@@ -11,7 +11,7 @@ const unknownEndpoint = (request, response) => {
 const errorHandler = (error, request, response, next) => {
   logger.error(error.message);
   if (error.name === "CastError") {
-    return response.status(400).send({ error: "malformatted id" });
+    return response.status(400).send({ error: "malformed id" });
   }
   if (error.name === "ValidationError") {
     return response.status(400).json({ error: error.message });
@@ -67,13 +67,13 @@ const findUserSession = async (req, res, next) => {
   try {
     const token = getTokenFrom(req);
     const decodedToken = jwt.verify(token, SECRET);
-    req.user = await User.findByPk(decodedToken.id);
-    const { id } = req.user;
+    req.jwtUser = await User.findByPk(decodedToken.id);
+    const { id } = req.jwtUser;
     const validSession = await validateSession({ id, token });
     if (!decodedToken.id || !validSession) {
       throw Error("Session not valid!");
     }
-    if (req.user.disabled) {
+    if (req.jwtUser.disabled) {
       throw Error("User disabled!");
     }
     next();

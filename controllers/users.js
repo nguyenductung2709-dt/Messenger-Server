@@ -6,10 +6,12 @@ const multer = require("multer");
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
+const crypto = require("crypto"); 
 
 const bcrypt = require("bcrypt"); // used to encrypt passwords
 const middleware = require("../utils/middleware");
-const { User, Conversation, Friend } = require("../models/index");
+const { User, Conversation, Friend, Token } = require("../models/index");
+const { sendingMail } = require("../utils/mailing");
 
 // AWS S3 SDK library to upload and get images from AWS S3
 const {
@@ -92,13 +94,68 @@ router.post("/", upload.single("avatarImage"), async (req, res) => {
     passwordHash,
   };
 
+  const { gmail, firstName, lastName } = req.body;
+
   if (imageName) {
     userData.avatarName = imageName;
   }
 
   const user = await User.create(userData);
-  return res.status(201).json(user);
+  if (user) {
+    let setToken = await Token.create({
+      userId: user.id,
+      token: crypto.randomBytes(16).toString("hex"),
+    });
+    if (setToken) {
+      sendingMail({
+        from: "no-reply@example.com",
+        to: `${gmail}`,
+        subject: "Please Verify Your Email Address",
+        text: `Hello, ${firstName} ${lastName},
+        
+Thank you for registering with Tung Messaging App. To complete your registration, please verify your email address by clicking the link below:
+
+${process.env.APP_URL}/api/users/verify-email/${user.id}/${setToken.token}
+
+If you did not request this, please ignore this email.
+      
+Thank you for choosing Tung Messaging App.
+      
+Best regards,
+Tung Nguyen
+Tung Messaging App
+tungdtnguyen123@gmail.com
+`,
+      });           
+    } else {
+      return res.status(400).send("token not created");
+    }
+
+    console.log("user", JSON.stringify(user, null, 2));
+
+    return res.status(201).send(user);
+  } else {
+    return res.status(409).send("Details are not correct");
+  }
 });
+
+router.get('/verify-email/:id/:token', async(req, res) => {
+  const user = await User.findByPk(req.params.id);
+  const token = await Token.findOne({
+    where: {
+      userId: req.params.id,
+      token: req.params.token
+    }
+  });
+
+  if (user && token) {
+    await user.update({ isVerified: true });
+    await token.destroy();
+    return res.status(200).send("Email verified successfully");
+  } else {
+    return res.status(400).send("Invalid token");
+  }
+})
 
 router.put(
   "/:id",
