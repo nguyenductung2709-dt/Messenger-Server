@@ -10,13 +10,16 @@ module.exports = {
       },
       gmail: {
         type: DataTypes.TEXT,
-        unique: true,
         allowNull: false,
         validate: {
           isEmail: {
             msg: "Username must be a valid email address",
           },
         },
+      },
+      username: {
+        type: DataTypes.TEXT,
+        unique: true,
       },
       password_hash: {
         type: DataTypes.TEXT,

@@ -113,9 +113,9 @@ router.get(
 );
 
 router.post("/login", async (req, res) => {
-  const { gmail, password } = req.body;
+  const { username, password } = req.body;
   const user = await User.findOne(
-    { where: { gmail } },
+    { where: { username } },
     { attributes: { exclude: ["passwordHash"] } },
   );
   
@@ -137,7 +137,7 @@ router.post("/login", async (req, res) => {
     });
   }
   const userForToken = {
-    gmail: user.gmail,
+    username: user.username,
     id: user.id,
   };
   const token = jwt.sign(userForToken, SECRET, { expiresIn: 60 * 60 });
@@ -154,7 +154,7 @@ router.post("/login", async (req, res) => {
     userId: user.id,
     token,
   });
-  return res.status(200).send({ id: user.id, token, gmail: user.gmail });
+  return res.status(200).send({ id: user.id, token, username: user.username });
 });
 
 router.post("/logout", middleware.findUserSession, async (req, res) => {

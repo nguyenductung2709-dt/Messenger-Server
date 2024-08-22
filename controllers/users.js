@@ -107,13 +107,23 @@ router.post("/", upload.single("avatarImage"), async (req, res) => {
     passwordHash,
   };
 
-  const { gmail, firstName, lastName } = req.body;
+  const { username, gmail, firstName, lastName } = req.body;
 
   if (imageName) {
     userData.avatarName = imageName;
   }
+  const userWithUserName = await User.findOne({ where: { username } });
+  if (userWithUserName) {
+    return res.status(400).json({ error: "Username is already taken" });
+  }
+
+  const userWithVerifiedGmail = await User.findOne({ where: { gmail, isVerified: true } });
+  if (userWithVerifiedGmail) {
+    return res.status(400).json({ error: "Email is already used and verified by other user" });
+  }
 
   const user = await User.create(userData);
+
   if (user) {
     let setToken = await Token.create({
       userId: user.id,
@@ -126,7 +136,7 @@ router.post("/", upload.single("avatarImage"), async (req, res) => {
         subject: "Please Verify Your Email Address",
         text: `Hello, ${firstName} ${lastName},
         
-Thank you for registering with Tung Messaging App. To complete your registration, please verify your email address by clicking the link below:
+Thank you for registering with Tung Messaging App. To complete your registration with account ${username}, please verify your email address by clicking the link below:
 
 ${process.env.APP_URL}/api/users/verify-email/${user.id}/${setToken.token}
 
@@ -152,6 +162,46 @@ tungdtnguyen123@gmail.com
   }
 });
 
+router.post('/resend-verification-email/:id', async(req, res) => {
+  const oldToken = await Token.findOne({ where: { userId: req.params.id }});
+  if (oldToken) {
+    await oldToken.destroy();
+  }
+  const user = await User.findOne({ where: { id: req.params.id } });
+  const userWithVerifiedGmail = await User.findOne({ where: { gmail: user.gmail, isVerified: true } });
+  if (userWithVerifiedGmail) {
+    return res.status(400).json({ error: "Email is already used and verified by other user. Please change to another email address." });
+  }
+  if (user) {
+    let setToken = await Token.create({
+      userId: user.id,
+      token: crypto.randomBytes(16).toString("hex"),
+    });
+    if (setToken) {
+      sendingMail({
+        from: "no-reply@example.com",
+        to: `${user.gmail}`,
+        subject: "Please Verify Your Email Address",
+        text: `Hello, ${user.firstName} ${user.lastName},
+
+Thank you for registering with Tung Messaging App. To complete your registration with account ${user.username}, please verify your email address by clicking the link below:
+
+${process.env.APP_URL}/api/users/verify-email/${user.id}/${setToken.token}
+
+If you did not request this, please ignore this email.
+      
+Thank you for choosing Tung Messaging App.
+      
+Best regards,
+Tung Nguyen
+Tung Messaging App
+tungdtnguyen123@gmail.com
+`, });
+  }
+  return res.status(200).send("Email sent successfully");
+}      
+});
+
 router.get('/verify-email/:id/:token', async(req, res) => {
   const user = await User.findByPk(req.params.id);
   const token = await Token.findOne({
@@ -164,7 +214,7 @@ router.get('/verify-email/:id/:token', async(req, res) => {
   if (user && token) {
     await user.update({ isVerified: true });
     await token.destroy();
-    return res.status(200).send("Email verified successfully");
+    res.redirect(`${process.env.APP_URL}/email-verification-success`);
   } else {
     return res.status(400).send("Invalid token");
   }

@@ -10,9 +10,12 @@ User.init(
       primaryKey: true,
       autoIncrement: true,
     },
-    gmail: {
+    username: {
       type: DataTypes.TEXT,
       unique: true,
+    },
+    gmail: {
+      type: DataTypes.TEXT,
       allowNull: false,
       validate: {
         isEmail: {
