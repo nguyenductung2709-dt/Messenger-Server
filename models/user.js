@@ -64,6 +64,14 @@ User.init(
       type: DataTypes.BOOLEAN,
       defaultValue: false
     },
+    resetPasswordToken: {
+      type: DataTypes.TEXT,
+      defaultValue: null
+    },
+    tokenExpiry: {
+      type: DataTypes.DATE,
+      defaultValue: null
+    },
   },
   {
     sequelize,

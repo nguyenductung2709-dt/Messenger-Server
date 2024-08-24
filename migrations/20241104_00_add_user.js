@@ -61,6 +61,14 @@ module.exports = {
         type: DataTypes.BOOLEAN,
         defaultValue: false
       },
+      reset_password_token: {
+        type: DataTypes.TEXT,
+        defaultValue: null
+      },
+      token_expiry: {
+        type: DataTypes.DATE,
+        defaultValue: null
+      }
     });
   },
 

@@ -63,6 +63,11 @@ const validateSession = async ({ id, token }) => {
   return session && session.token === token;
 };
 
+function isValidEmail(email) {
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailPattern.test(email);
+}
+
 const findUserSession = async (req, res, next) => {
   try {
     const token = getTokenFrom(req);
@@ -88,4 +93,5 @@ module.exports = {
   tokenExtractor,
   validateSession,
   findUserSession,
+  isValidEmail,
 };

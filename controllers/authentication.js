@@ -1,10 +1,12 @@
 const router = require("express").Router();
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto"); 
 const { SECRET } = require("../utils/config");
 const { User, Session } = require("../models/index");
 const middleware = require("../utils/middleware");
 const passport = require("passport");
+const { sendingMail } = require("../utils/mailing");
 
 router.get("/login/success", async (req, res) => {
   const user = req.user;
@@ -170,14 +172,78 @@ router.post("/logout", middleware.findUserSession, async (req, res) => {
   return res.status(200).json({ message: "Successfully logged out!" });
 });
 
-/*
-router.post('/reset_password', async (req, res) => {
+
+router.post('/request-reset-password', async (req, res) => {
+  console.log(req.body);
+  const input = req.body.input;
+  console.log(input);
+  const query = middleware.isValidEmail(input) ? { gmail: input } : { username: input };
+  console.log(query);
+  const user = await User.findOne({ where: query });
+
+  if (!user) return res.status(404).json({ error: "User not found" });
+  if (!user.isVerified) return res.status(403).json({ error: "Email address was not verified" });
+
+  const token = crypto.randomBytes(16).toString("hex");
+  const tokenHash = await bcrypt.hash(token, 10);
+
+  user.resetPasswordToken = tokenHash;
+  await user.save();
+
+  sendingMail({
+    from: "no-reply@example.com",
+    to: user.gmail,
+    subject: "Password Reset Request for Your Tung Messaging App Account",
+    text: `Hello, ${user.firstName} ${user.lastName},
+
+We received a request to reset the password for your account on Tung Messaging App. If you made this request, here is the verification code you need to reset your password:
+
+${token}
+
+Please acccess the following link to reset your password:
+
+${process.env.APP_URL}/reset-password?id=${user.id}&token=${tokenHash}
+
+If you did not request a password reset, please ignore this email. Your account will remain secure, and no changes will be made.
+
+Thank you for choosing Tung Messaging App.
+
+Best regards,
+Tung Nguyen
+Tung Messaging App
+tungdtnguyen123@gmail.com`,
+  });
+
+  return res.status(200).json({ message: "Token was sent successfully" });
+});
+
+router.put('/reset-password', async (req, res) => {
+  const { id, token, password } = req.body;
+
   try {
-    //Implement later with frontend
-  } catch (err) {
-    //Implement later with frontend
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!token) {
+      return res.status(400).json({ error: "Token is required" });
+    }
+
+    const isTokenValid = await bcrypt.compare(token, user.resetPasswordToken);
+    if (!isTokenValid) {
+      return res.status(400).json({ error: "Invalid token" });
+    }
+
+    user.resetPasswordToken = null;
+    user.passwordHash = await bcrypt.hash(password, 10);
+    await user.save();
+
+    return res.status(200).json({ message: "Password reset successfully" });
+  } catch (error) {
+    return res.status(500).json({ error: "An error occurred while resetting the password" });
   }
 });
-*/
+
 
 module.exports = router;
