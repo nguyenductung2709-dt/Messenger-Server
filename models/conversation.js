@@ -1,5 +1,5 @@
 const { Model, DataTypes } = require("sequelize");
-const { sequelize } = require("../utils/db");
+const { sequelize } = require("../utils/database/db");
 
 class Conversation extends Model {}
 Conversation.init(

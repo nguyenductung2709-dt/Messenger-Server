@@ -1,7 +1,7 @@
 /* eslint-disable no-use-before-define */
 const Sequelize = require("sequelize");
 const { Umzug, SequelizeStorage } = require("umzug");
-const { DATABASE_URL } = require("./config");
+const { DATABASE_URL } = require("../config");
 
 const sequelize = new Sequelize(DATABASE_URL, {
   dialect: "postgresql",

@@ -1,11 +1,11 @@
 const OAuth2Strategy = require("passport-google-oauth20").Strategy;
 const passport = require("passport");
-require('dotenv').config();
+const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = require("./config");
 
 passport.use(
 		new OAuth2Strategy({
-			clientID: process.env.GOOGLE_CLIENT_ID,
-			clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+			clientID: GOOGLE_CLIENT_ID,
+			clientSecret: GOOGLE_CLIENT_SECRET,
 			callbackURL:"/api/auth/google/callback",
 			scope:["profile","email"]
 		},

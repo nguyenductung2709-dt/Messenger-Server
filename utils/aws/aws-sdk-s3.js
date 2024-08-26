@@ -1,9 +1,10 @@
 const crypto = require("crypto");
-const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/cloudfront-signer");
+const { BUCKET_NAME, CDN_URL, CLOUDFRONT_PRIVATE_KEY, CLOUDFRONT_KEY_PAIR_ID } = require('../config')
 const s3 = require("./s3user");
-// eslint-disable-next-line no-undef
-const bucketName = process.env.BUCKET_NAME;
+
+const bucketName = BUCKET_NAME;
 
 const randomFileName = (bytes = 32) =>
   crypto.randomBytes(bytes).toString("hex"); // generate random image name to avoid conflicts
@@ -21,10 +22,10 @@ const uploadFile = async (fileName, fileBuffer, fileContent) => {
 
 const generateSignedUrl = async (Key) => {
   return getSignedUrl({
-    url: process.env.CDN_URL + Key,
+    url: CDN_URL + Key,
     dateLessThan: new Date(Date.now() + 1000 * 60 * 60 * 24),
-    privateKey: process.env.CLOUDFRONT_PRIVATE_KEY,
-    keyPairId: process.env.CLOUDFRONT_KEY_PAIR_ID,
+    privateKey: CLOUDFRONT_PRIVATE_KEY,
+    keyPairId: CLOUDFRONT_KEY_PAIR_ID,
   })
 };
 

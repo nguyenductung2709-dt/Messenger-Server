@@ -1,9 +1,10 @@
 const { CreateInvalidationCommand } = require("@aws-sdk/client-cloudfront");
 const cloudfront = require("./cloudfront-client");
+const { CLOUD_FRONT_DISTRIBUTION_ID } = require('../config')
 
 const invalidateCloudFrontCache = async (Key) => {
     const cfCommand = new CreateInvalidationCommand({
-        DistributionId: process.env.CLOUD_FRONT_DISTRIBUTION_ID,
+        DistributionId: CLOUD_FRONT_DISTRIBUTION_ID,
         InvalidationBatch: {
           CallerReference: Key,
           Paths: {

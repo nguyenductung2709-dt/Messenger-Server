@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import globals from "globals";
 import pluginJs from "@eslint/js";
 

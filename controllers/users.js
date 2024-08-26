@@ -6,87 +6,51 @@ const multer = require("multer");
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-const crypto = require("crypto"); 
 
 const bcrypt = require("bcrypt"); // used to encrypt passwords
-const middleware = require("../utils/middleware");
+const { pushUpdatedFields, generateAvatarUrl } = require('../utils/helper-functions');
+const { findUserSession } = require("../utils/middleware");
 const { User, Conversation, Friend, Token } = require("../models/index");
-const { sendingMail } = require("../utils/mailing");
+const { createTokenAndSendEmail } = require("../utils/authentication-helper/auth");
+const { APP_URL, SALT_ROUNDS } = require("../utils/config");
 
 // AWS S3 SDK library to upload and get images from AWS S3
-const {
-  randomFileName,
-  uploadFile,
-  generateSignedUrl,
-} = require("../utils/aws-sdk-s3");
+const { randomFileName, uploadFile } = require("../utils/aws/aws-sdk-s3");
 
-const {
-  invalidateCloudFrontCache,
-} = require("../utils/aws-sdk-cloudfront");
-
-function isValidUrl(string) {
-  try {
-    new URL(string);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
+const usersAttributeAndIncludeOptions = {
+  attributes: { exclude: ["passwordHash"] },
+  include: [
+    {
+      model: Conversation,
+      as: "conversation",
+      through: {
+        as: "participant",
+      },
+    },
+    {
+      model: Friend,
+    },
+  ],
+};
 
 router.get("/", async (req, res) => {
-  const users = await User.findAll({
-    attributes: { exclude: ["passwordHash"] },
-    include: [
-      {
-        model: Conversation,
-        as: "conversation",
-        through: {
-          as: "participant",
-        },
-      },
-      {
-        model: Friend,
-      },
-    ],
-  });
+  const users = await User.findAll(usersAttributeAndIncludeOptions);
 
   await Promise.all(users.map(async(user) => {
-    if (user.avatarName) {
-      if (!isValidUrl(user.avatarName)) {
-        user.avatarName = await generateSignedUrl(user.avatarName);
-      }
-    }
+    await generateAvatarUrl(user);
   }))
 
   return res.status(200).json(users);
 });
 
 router.get("/:id", async (req, res) => {
-  const user = await User.findByPk(req.params.id, {
-    attributes: { exclude: ["passwordHash"] },
-    include: [
-      {
-        model: Conversation,
-        as: "conversation",
-        through: {
-          as: "participant",
-        },
-      },
-      {
-        model: Friend,
-      },
-    ],
-  });
+  const user = await User.findByPk(req.params.id, usersAttributeAndIncludeOptions);
 
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
 
-  if (user.avatarName) {
-    if (!isValidUrl(user.avatarName)) {
-      user.avatarName = await generateSignedUrl(user.avatarName);
-    }
-  }
+  await generateAvatarUrl(user);
 
   return res.status(200).json(user);
 });
@@ -99,15 +63,14 @@ router.post("/", upload.single("avatarImage"), async (req, res) => {
     await uploadFile(imageName, req.file.buffer, req.file.mimetype);
   }
 
-  const saltRounds = 10;
-  const passwordHash = await bcrypt.hash(req.body.password, saltRounds);
+  const passwordHash = await bcrypt.hash(req.body.password, SALT_ROUNDS);
 
   const userData = {
     ...req.body,
     passwordHash,
   };
 
-  const { username, gmail, firstName, lastName } = req.body;
+  const { username, gmail } = req.body;
 
   if (imageName) {
     userData.avatarName = imageName;
@@ -125,40 +88,10 @@ router.post("/", upload.single("avatarImage"), async (req, res) => {
   const user = await User.create(userData);
 
   if (user) {
-    let setToken = await Token.create({
-      userId: user.id,
-      token: crypto.randomBytes(16).toString("hex"),
-    });
-    if (setToken) {
-      sendingMail({
-        from: "no-reply@example.com",
-        to: `${gmail}`,
-        subject: "Please Verify Your Email Address",
-        text: `Hello, ${firstName} ${lastName},
-        
-Thank you for registering with Tung Messaging App. To complete your registration with account ${username}, please verify your email address by clicking the link below:
-
-${process.env.APP_URL}/api/users/verify-email/${user.id}/${setToken.token}
-
-If you did not request this, please ignore this email.
-      
-Thank you for choosing Tung Messaging App.
-      
-Best regards,
-Tung Nguyen
-Tung Messaging App
-tungdtnguyen123@gmail.com
-`,
-      });           
-    } else {
-      return res.status(400).send("token not created");
-    }
-
-    console.log("user", JSON.stringify(user, null, 2));
-
+    await createTokenAndSendEmail(user);
     return res.status(201).send(user);
   } else {
-    return res.status(409).send("Details are not correct");
+    return res.status(404).send("User not created");
   }
 });
 
@@ -168,39 +101,20 @@ router.post('/resend-verification-email/:id', async(req, res) => {
     await oldToken.destroy();
   }
   const user = await User.findOne({ where: { id: req.params.id } });
+  
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
   const userWithVerifiedGmail = await User.findOne({ where: { gmail: user.gmail, isVerified: true } });
   if (userWithVerifiedGmail) {
     return res.status(400).json({ error: "Email is already used and verified by other user. Please change to another email address." });
   }
-  if (user) {
-    let setToken = await Token.create({
-      userId: user.id,
-      token: crypto.randomBytes(16).toString("hex"),
-    });
-    if (setToken) {
-      sendingMail({
-        from: "no-reply@example.com",
-        to: `${user.gmail}`,
-        subject: "Please Verify Your Email Address",
-        text: `Hello, ${user.firstName} ${user.lastName},
-
-Thank you for registering with Tung Messaging App. To complete your registration with account ${user.username}, please verify your email address by clicking the link below:
-
-${process.env.APP_URL}/api/users/verify-email/${user.id}/${setToken.token}
-
-If you did not request this, please ignore this email.
-      
-Thank you for choosing Tung Messaging App.
-      
-Best regards,
-Tung Nguyen
-Tung Messaging App
-tungdtnguyen123@gmail.com
-`, });
-  }
+  await createTokenAndSendEmail(user);
+  
   return res.status(200).send("Email sent successfully");
 }      
-});
+);
 
 router.get('/verify-email/:id/:token', async(req, res) => {
   const user = await User.findByPk(req.params.id);
@@ -214,58 +128,30 @@ router.get('/verify-email/:id/:token', async(req, res) => {
   if (user && token) {
     await user.update({ isVerified: true });
     await token.destroy();
-    res.redirect(`${process.env.APP_URL}/email-verification-success`);
+    res.redirect(`${APP_URL}/email-verification-success`);
   } else {
     return res.status(400).send("Invalid token");
   }
 })
 
-router.put(
-  "/:id",
-  upload.single("avatarImage"),
-  middleware.findUserSession,
-  async (req, res) => {
-    const userWithId = await User.findByPk(req.params.id);
-    const {user} = req;
+router.put("/:id", upload.single("avatarImage"), findUserSession, async (req, res) => {
+  const { id } = req.params;
+  const { user } = req;
+  const userWithId = await User.findByPk(id);
 
-    if (!userWithId) {
-      return res.status(404).json({ error: "User not found" })
-    }
-    if (!user || user.id !== Number(req.params.id)) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+  if (!userWithId) {
+    return res.status(404).json({ error: "User not found" });
+  }
 
-    const updatedFields = {};
-    if (req.body.gmail) {
-      updatedFields.gmail = req.body.gmail;
-    }
-    if (req.body.firstName) {
-      updatedFields.firstName = req.body.firstName;
-    }
-    if (req.body.lastName) {
-      updatedFields.lastName = req.body.lastName;
-    }
-    if (req.body.middleName) {
-      updatedFields.middleName = req.body.middleName;
-    }
-    if (req.body.dateOfBirth) {
-      updatedFields.dateOfBirth = req.body.dateOfBirth;
-    }
+  if (!user || user.id !== Number(id)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
-    if (req.file) {
-      if (user.avatarName) {
-        await uploadFile(user.avatarName, req.file.buffer, req.file.mimetype);
-        await invalidateCloudFrontCache(user.avatarName);
-      } else {
-        const imageName = randomFileName();
-        await uploadFile(imageName, req.file.buffer, req.file.mimetype);
-        updatedFields.avatarName = imageName;
-      }
-    }
-    
-    await user.update(updatedFields);
-    return res.status(201).json(user);
-  },
-);
+  const fieldsToUpdate = ["gmail", "firstName", "lastName", "middleName", "dateOfBirth"];
+  const updatedFields = await pushUpdatedFields(req.body, fieldsToUpdate, req.file, user, "avatarName");
+
+  await user.update(updatedFields);
+  return res.status(201).json(user);
+});
 
 module.exports = router;
